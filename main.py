@@ -1,12 +1,13 @@
 import tkinter as tk
 import requests
 from PIL import Image, ImageTk
-
+from pathlib import Path
 from io import BytesIO
+import random
 
 TEST_DELAY_MS = 5000
 WINDOW_WIDTH = 700
-WINDOW_HEIGHT = 500
+WINDOW_HEIGHT = 700
 
 FALLBACK_QUOTES = [
     "I'd tell you a UDP joke, but I'm not sure you'd get it.",
@@ -14,12 +15,11 @@ FALLBACK_QUOTES = [
     "Programmers prefer the dark mode because light attracts bugs.",
 ]
 
-FALLBACK_IMAGES = [
-    "assets/fallback_1.png",
-    "assets/fallback_2.png",
-    "assets/fallback_3.png",
-    "assets/fallback_4.png",
-]
+ASSETS_DIR = Path("assets")
+
+FALLBACK_IMAGES = list(
+    ASSETS_DIR.glob("fallback_*.png")
+)
 
 CAT_API = "https://api.thecatapi.com/v1/images/search"
 
@@ -32,18 +32,21 @@ def get_quote():
 
 def get_image():
     try:
-        response = requests.get(CAT_API, timeout=5) # Download JSON
-        response.raise_for_status() # Catches any errors early
-        data = response.json()
+        fallback_image = random.choice(FALLBACK_IMAGES)
+        image = Image.open(fallback_image)
 
-        image_url = data[0]["url"]
-        image_response = requests.get(image_url, timeout=5)
-        image_response.raise_for_status()
+        # response = requests.get(CAT_API, timeout=5) # Download JSON
+        # response.raise_for_status() # Catches any errors early
+        # data = response.json()
 
-        # image_response.content is Raw Bytes
-        # BytesIO pretends those bytes are in a file
-        # .open() reads the JPEG
-        image = Image.open(BytesIO(image_response.content))
+        # image_url = data[0]["url"]
+        # image_response = requests.get(image_url, timeout=5)
+        # image_response.raise_for_status()
+
+        # # image_response.content is Raw Bytes
+        # # BytesIO pretends those bytes are in a file
+        # # .open() reads the JPEG
+        # image = Image.open(BytesIO(image_response.content))
 
     except requests.RequestException:
         fallback_image = random.choice(FALLBACK_IMAGES)

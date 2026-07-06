@@ -9,12 +9,6 @@ TEST_DELAY_MS = 5000
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
 
-FALLBACK_QUOTES = [
-    "I'd tell you a UDP joke, but I'm not sure you'd get it.",
-    "There are only 10 kinds of people: those who understand binary and those who don't.",
-    "Programmers prefer the dark mode because light attracts bugs.",
-]
-
 ASSETS_DIR = Path("assets")
 
 FALLBACK_IMAGES = list(
@@ -23,30 +17,20 @@ FALLBACK_IMAGES = list(
 
 CAT_API = "https://api.thecatapi.com/v1/images/search"
 
-
-def get_quote():
-    try:
-        pass # get quote from internet
-    except Exception:
-        return random.choice(FALLBACK_QUOTES)
-
 def get_image():
     try:
-        fallback_image = random.choice(FALLBACK_IMAGES)
-        image = Image.open(fallback_image)
+        response = requests.get(CAT_API, timeout=5) # Download JSON
+        response.raise_for_status() # Catches any errors early
+        data = response.json()
 
-        # response = requests.get(CAT_API, timeout=5) # Download JSON
-        # response.raise_for_status() # Catches any errors early
-        # data = response.json()
+        image_url = data[0]["url"]
+        image_response = requests.get(image_url, timeout=5)
+        image_response.raise_for_status()
 
-        # image_url = data[0]["url"]
-        # image_response = requests.get(image_url, timeout=5)
-        # image_response.raise_for_status()
-
-        # # image_response.content is Raw Bytes
-        # # BytesIO pretends those bytes are in a file
-        # # .open() reads the JPEG
-        # image = Image.open(BytesIO(image_response.content))
+        # image_response.content is Raw Bytes
+        # BytesIO pretends those bytes are in a file
+        # .open() reads the JPEG
+        image = Image.open(BytesIO(image_response.content))
 
     except requests.RequestException:
         fallback_image = random.choice(FALLBACK_IMAGES)
@@ -68,10 +52,6 @@ def enable_inputs():
     start_button.config(state="normal")
 
 def update_content():
-    quote_label.config(
-        text=get_quote()
-    )
-
     photo = get_image()
 
     image_label.config(
@@ -81,7 +61,8 @@ def update_content():
     image_label.image = photo
     # We are attaching a new attribute called image to the image_label object. In Python, most objects can have attributes added dynamically. By storing the PhotoImage there, we keep a reference to it alive. If we didn't, the local variable photo would disappear when update_content() returns, and Python's garbage collector could free the image, causing it to vanish from the window.
 
-    # The actual image data still belongs to the PhotoImage object, Tkinter does not copy the pixels into the widget. This is unlike for quotes, where widget has its own copy of the string                     
+    # The actual image data still belongs to the PhotoImage object, Tkinter does not copy the pixels into the widget. This is unlike for quotes, where widget has its own copy of the string      (quote_label.config(text=get_quote())  
+
 def timer_finished():
     update_content()
     root.deiconify() # Make the window visible again
@@ -117,9 +98,6 @@ root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 
 instruction_label = tk.Label(root)
 instruction_label.pack(padx=20, pady=20)
-
-quote_label = tk.Label(root)
-quote_label.pack(padx=20, pady=20)
 
 image_label = tk.Label(root)
 image_label.pack(padx=20, pady=20)

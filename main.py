@@ -1,4 +1,60 @@
 import tkinter as tk
+import requests
+from PIL import Image, ImageTk
+
+from io import BytesIO
+
+TEST_DELAY_MS = 5000
+WINDOW_WIDTH = 700
+WINDOW_HEIGHT = 500
+
+FALLBACK_QUOTES = [
+    "I'd tell you a UDP joke, but I'm not sure you'd get it.",
+    "There are only 10 kinds of people: those who understand binary and those who don't.",
+    "Programmers prefer the dark mode because light attracts bugs.",
+]
+
+FALLBACK_IMAGES = [
+    "assets/fallback_1.png",
+    "assets/fallback_2.png",
+    "assets/fallback_3.png",
+    "assets/fallback_4.png",
+]
+
+CAT_API = "https://api.thecatapi.com/v1/images/search"
+
+
+def get_quote():
+    try:
+        pass # get quote from internet
+    except Exception:
+        return random.choice(FALLBACK_QUOTES)
+
+def get_image():
+    try:
+        response = requests.get(CAT_API, timeout=5) # Download JSON
+        response.raise_for_status() # Catches any errors early
+        data = response.json()
+
+        image_url = data[0]["url"]
+        image_response = requests.get(image_url, timeout=5)
+        image_response.raise_for_status()
+
+        # image_response.content is Raw Bytes
+        # BytesIO pretends those bytes are in a file
+        # .open() reads the JPEG
+        image = Image.open(BytesIO(image_response.content))
+
+    except requests.RequestException:
+        fallback_image = random.choice(FALLBACK_IMAGES)
+        image = Image.open(fallback_image)
+
+    image.thumbnail((450, 300)) # Fit in the window
+    photo = ImageTk.PhotoImage(image) # Converts Pillow's image into something Tkinter understands
+
+    return photo
+
+
 
 def disable_inputs():
     time_entry.config(state="disabled")
@@ -8,9 +64,23 @@ def enable_inputs():
     time_entry.config(state="normal")
     start_button.config(state="normal")
 
+def update_content():
+    quote_label.config(
+        text=get_quote()
+    )
 
+    photo = get_image()
+
+    image_label.config(
+        image=photo
+    )
+
+    image_label.image = photo
+    # We are attaching a new attribute called image to the image_label object. In Python, most objects can have attributes added dynamically. By storing the PhotoImage there, we keep a reference to it alive. If we didn't, the local variable photo would disappear when update_content() returns, and Python's garbage collector could free the image, causing it to vanish from the window.
+
+    # The actual image data still belongs to the PhotoImage object, Tkinter does not copy the pixels into the widget. This is unlike for quotes, where widget has its own copy of the string                     
 def timer_finished():
-    print("Time for a break!")
+    update_content()
     root.deiconify() # Make the window visible again
     enable_inputs()
 
@@ -26,8 +96,8 @@ def start_timer():
         print(f"Starting timer for {minutes} minutes")
         disable_inputs()
         root.withdraw() # Hide the window, but keep the program running
-        milliseconds = 5000
-        root.after(milliseconds, timer_finished)
+        milliseconds = minutes * 60 * 1000
+        root.after(TEST_DELAY_MS, timer_finished)
         
     except ValueError as e:
         # Value error because usually strings can be converted into ints
@@ -39,11 +109,17 @@ def start_timer():
         # returns automatically here (the function ends immediately after this Except block)
 
 root = tk.Tk()
-root.title("Take a break!")
-root.geometry("700x500")
+root.title("Time for a break!")
+root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 
-label = tk.Label(root, text="Get up and stretch!")
-label.pack(padx=20, pady=20)
+instruction_label = tk.Label(root)
+instruction_label.pack(padx=20, pady=20)
+
+quote_label = tk.Label(root)
+quote_label.pack(padx=20, pady=20)
+
+image_label = tk.Label(root)
+image_label.pack(padx=20, pady=20)
 
 instruction = tk.Label(root, text="How many minutes until the next break?")
 instruction.pack(pady=10)
@@ -52,6 +128,9 @@ time_entry = tk.Entry(root)
 time_entry.pack()
 
 start_button = tk.Button(root, text="Start Timer", command=start_timer)
+# We skip the parenthesis when calling start_timer as we don't want to execute it immediately
+# This is unline the way we use get_quote or get_image since we need to execute those function
+# immediately and use their values
 start_button.pack(pady=20)
 
 root.mainloop()

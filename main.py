@@ -15,16 +15,33 @@ FALLBACK_IMAGES = list(
     ASSETS_DIR.glob("fallback_*.png")
 )
 
-CAT_API = "https://api.thecatapi.com/v1/images/search"
+XKCD_API = "https://xkcd.com/info.0.json"
 
 def get_image():
     try:
-        response = requests.get(CAT_API, timeout=5) # Download JSON
+        response = requests.get(XKCD_API, timeout=5) # Download JSON
         response.raise_for_status() # Catches any errors early
         data = response.json()
 
-        image_url = data[0]["url"]
-        image_response = requests.get(image_url, timeout=5)
+        number = data["num"]
+
+        # Choose a random comic
+        comic_number = random.randint(1, number)
+        comic_response = requests.get(
+            f"https://xkcd.com/{comic_number}/info.0.json",
+            timeout=5,
+        )
+        comic_response.raise_for_status()
+
+        comic_data = comic_response.json()
+
+        image_url = comic_data["img"]
+        title = comic_data["title"]
+
+        image_response = requests.get(
+            image_url,
+            timeout=5,
+        )
         image_response.raise_for_status()
 
         # image_response.content is Raw Bytes
@@ -35,11 +52,12 @@ def get_image():
     except requests.RequestException:
         fallback_image = random.choice(FALLBACK_IMAGES)
         image = Image.open(fallback_image)
+        title = "Time for a break!"
 
     image.thumbnail((450, 300)) # Fit in the window
     photo = ImageTk.PhotoImage(image) # Converts Pillow's image into something Tkinter understands
 
-    return photo
+    return photo, title
 
 
 
@@ -52,7 +70,12 @@ def enable_inputs():
     start_button.config(state="normal")
 
 def update_content():
-    photo = get_image()
+    photo, title = get_image()
+
+    instruction_label.config(
+        text=title,
+        font=("Sans", 18, "bold"),
+    )
 
     image_label.config(
         image=photo
@@ -96,11 +119,11 @@ root = tk.Tk()
 root.title("Time for a break!")
 root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 
-instruction_label = tk.Label(root)
+instruction_label = tk.Label(root, font=("Sans", 20, "bold"),)
 instruction_label.pack(padx=20, pady=20)
 
 image_label = tk.Label(root)
-image_label.pack(padx=20, pady=20)
+image_label.pack(pady=15)
 
 instruction = tk.Label(root, text="How many minutes until the next break?")
 instruction.pack(pady=10)

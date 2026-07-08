@@ -25,13 +25,13 @@ def enable_autostart():
     ensure_autostart_dir()
 
     desktop_contents = f"""\
-    [Desktop Entry]
-    Type=Application
-    Name=Break Reminder
-    Exec={PYTHON} {MAIN}
-    Terminal=false
-    X-GNOME-Autostart-enabled=true
-    """
+[Desktop Entry]
+Type=Application
+Name=Break Reminder
+Exec={PYTHON} {MAIN}
+Terminal=false
+X-GNOME-Autostart-enabled=true
+"""
 
     DESKTOP_FILE.write_text(desktop_contents)
 

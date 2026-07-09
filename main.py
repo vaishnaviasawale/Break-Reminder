@@ -5,6 +5,8 @@ from pathlib import Path
 from io import BytesIO
 import random
 
+import config
+
 TEST_DELAY_MS = 5000
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
@@ -87,11 +89,15 @@ def update_content():
     # The actual image data still belongs to the PhotoImage object, Tkinter does not copy the pixels into the widget. This is unlike for quotes, where widget has its own copy of the string      (quote_label.config(text=get_quote())  
 
 def timer_finished():
+    if not config.is_enabled():
+        return
     update_content()
     root.deiconify() # Make the window visible again
     enable_inputs()
 
 def start_timer():
+    if not config.is_enabled():
+        return
     minutes_text = time_entry.get()
 
     try:

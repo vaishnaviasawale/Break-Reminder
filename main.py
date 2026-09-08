@@ -154,11 +154,17 @@ def toggle_enabled():
 
 
 def timer_finished():
-    if not config.is_enabled():
-        return
-    update_content()
-    root.deiconify() # Make the window visible again
-    enable_inputs()
+    try:
+        if not config.is_enabled():
+            return
+        update_content()
+        root.deiconify() # Make the window visible again
+        enable_inputs()
+    except Exception as e:
+        print(f"Error while showing break: {e}")
+
+        root.deiconify()
+        enable_inputs()
 
 def start_timer():
     if not config.is_enabled():
@@ -186,9 +192,13 @@ def start_timer():
         # Do I need to return here? No, because Python has reached the end of the function and
         # returns automatically here (the function ends immediately after this Except block)
 
+def quit_app():
+    root.destroy()
+
 root = tk.Tk()
 root.title("Time for a break!")
 root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+root.protocol("WM_DELETE_WINDOW", quit_app)
 
 instruction_label = tk.Label(root, font=("Sans", 20, "bold"),)
 instruction_label.pack(padx=20, pady=20)

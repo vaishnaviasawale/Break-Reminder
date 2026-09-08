@@ -88,6 +88,22 @@ def update_content():
 
     # The actual image data still belongs to the PhotoImage object, Tkinter does not copy the pixels into the widget. This is unlike for quotes, where widget has its own copy of the string      (quote_label.config(text=get_quote())  
 
+def update_control_button():
+    if config.is_enabled():
+        control_status_button.config(text="Disable Reminder")
+    else:
+        control_status_button.config(text="Enable Reminder")
+
+
+def toggle_enabled():
+    if config.is_enabled():
+        config.disable()
+    else:
+        config.enable()
+
+    update_control_button()
+
+
 def timer_finished():
     if not config.is_enabled():
         return
@@ -142,5 +158,14 @@ start_button = tk.Button(root, text="Start Timer", command=start_timer)
 # This is unline the way we use get_quote or get_image since we need to execute those function
 # immediately and use their values
 start_button.pack(pady=20)
+
+control_status_button = tk.Button(
+    root,
+    command=toggle_enabled,
+)
+
+control_status_button.pack(pady=10)
+
+update_control_button()
 
 root.mainloop()

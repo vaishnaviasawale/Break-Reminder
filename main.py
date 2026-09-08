@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 from pathlib import Path
 from io import BytesIO
 import random
+from ddgs import DDGS
 
 import config
 
@@ -19,7 +20,15 @@ FALLBACK_IMAGES = list(
 
 XKCD_API = "https://xkcd.com/info.0.json"
 
-def get_image():
+TOPICS = [
+    "beautiful landscapes",
+    "seaside views",
+    "European towns",
+    "fairy illustrations",
+    "puppies",
+]
+
+def get_xkcd_image():
     try:
         response = requests.get(XKCD_API, timeout=5) # Download JSON
         response.raise_for_status() # Catches any errors early
@@ -51,16 +60,56 @@ def get_image():
         # .open() reads the JPEG
         image = Image.open(BytesIO(image_response.content))
 
+        return image, title
+
     except requests.RequestException:
+        raise
+
+
+def get_duckduckgo_image(topic):
+    results = list(
+        DDGS().images(
+            topic,
+            max_results=1,
+        )
+    )
+
+    if not results:
+        raise RuntimeError("No images found")
+
+    image_url = results[0]["image"]
+
+    response = requests.get(
+        image_url,
+        timeout=5,
+    )
+    response.raise_for_status()
+
+    image = Image.open(BytesIO(response.content))
+
+    return image, topic
+
+
+def get_image():
+    try:
+        sources = ["xkcd"] + TOPICS
+        source = random.choice(sources)
+
+        if source == "xkcd":
+            image, title = get_xkcd_image()
+        else:
+            image, title = get_duckduckgo_image(source)
+
+    except (requests.RequestException, RuntimeError, OSError):
         fallback_image = random.choice(FALLBACK_IMAGES)
         image = Image.open(fallback_image)
         title = "Time for a break!"
 
-    image.thumbnail((450, 300)) # Fit in the window
-    photo = ImageTk.PhotoImage(image) # Converts Pillow's image into something Tkinter understands
+    image.thumbnail((450, 300))
+
+    photo = ImageTk.PhotoImage(image)
 
     return photo, title
-
 
 
 def disable_inputs():

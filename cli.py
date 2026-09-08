@@ -1,6 +1,8 @@
 import sys # System module to interact with the Python runtime environment (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
+import config
+
 PROJECT_DIR = Path(__file__).resolve().parent
 PYTHON = PROJECT_DIR / ".venv" / "bin" / "python"
 MAIN = PROJECT_DIR / "main.py"
@@ -41,28 +43,66 @@ def disable_autostart():
     if DESKTOP_FILE.exists():
         DESKTOP_FILE.unlink()
         # This is like deleting the file. It removes the .desktop file from ~/.config/autostart, which means the program will no longer launch automatically when the user logs in.
-        print("Break Reminder disabled.")
+        print("Break Reminder autostart disabled.")
     else:
-        print("Already disabled.")
+        print("Break reminder utostart is already disabled.")
 
 def status_autostart():
 
     if DESKTOP_FILE.exists():
-        print("Enabled")
+        print("Break reminder autostart is enabled")
     else:
-        print("Disabled")
+        print("Break reminder autostart is disabled")
 
-if len(sys.argv) != 3:
+# Command-line argument handling
+if len(sys.argv) < 2:
     print("Usage:")
+    print()
+    print("  python cli.py enable")
+    print("  python cli.py disable")
+    print("  python cli.py status")
+    print()
     print("  python cli.py autostart enable")
     print("  python cli.py autostart disable")
     print("  python cli.py autostart status")
     raise SystemExit(1)
 
 command = sys.argv[1]
-subcommand = sys.argv[2]
 
-if command == "autostart":
+# Reminder configuration
+if command == "enable":
+    if len(sys.argv) != 2:
+        print("Break reminder usage: python cli.py enable")
+        raise SystemExit(1)
+
+    config.enable()
+    print("Break reminder enabled.")
+
+elif command == "disable":
+    if len(sys.argv) != 2: 
+        print("Break reminder usage: python cli.py disable") 
+        raise SystemExit(1)
+
+    config.disable()
+    print("Break reminder disabled.")
+
+elif command == "status":
+    if len(sys.argv) != 2:
+        print("Break reminder usage: python cli.py status")
+        raise SystemExit(1)
+
+    config.status()
+
+# Autostart configuration
+elif command == "autostart":
+    if len(sys.argv) != 3:
+        print("Usage:")
+        print("  python cli.py autostart enable")
+        print("  python cli.py autostart disable")
+        print("  python cli.py autostart status")
+
+    subcommand = sys.argv[2]
+
     if subcommand == "enable":
         enable_autostart()
     elif subcommand == "disable":

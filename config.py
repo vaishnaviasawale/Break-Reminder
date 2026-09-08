@@ -62,6 +62,6 @@ def disable():
 
 def status():
     if is_enabled():
-        print("Enabled")
+        print("Break reminder is enabled")
     else:
-        print("Disabled")
+        print("Break reminder is disabled")

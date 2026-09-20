@@ -9,7 +9,6 @@ from PIL import Image, ImageTk
 
 import config
 
-TEST_DELAY_MS = 5000
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
 
@@ -96,7 +95,7 @@ def get_image():
         else:
             image, title = get_duckduckgo_image(source)
 
-    except requests.RequestException, RuntimeError, OSError:
+    except (requests.RequestException, RuntimeError, OSError):
         fallback_image = random.choice(FALLBACK_IMAGES)
         image = Image.open(fallback_image)
         title = "Time for a break!"
@@ -184,7 +183,7 @@ def start_timer():
         disable_inputs()
         root.withdraw()  # Hide the window, but keep the program running
         milliseconds = minutes * 60 * 1000
-        root.after(TEST_DELAY_MS, timer_finished)
+        root.after(milliseconds, timer_finished)
 
     except ValueError as e:
         # Value error because usually strings can be converted into ints
@@ -202,40 +201,56 @@ def quit_app():
     root.destroy()
 
 
-root = tk.Tk()
-root.title("Time for a break!")
-root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-root.protocol("WM_DELETE_WINDOW", quit_app)
+def main():
+    global root
+    global instruction_label
+    global image_label
+    global time_entry
+    global start_button
+    global control_status_button
+    # These variables existed at a module level - when moved inside main,
+    # they become local to main(). The global declarations tell Python:
+    # "These variables belong to the module; make them available to the other
+    # functions too."
 
-instruction_label = tk.Label(
-    root,
-    font=("Sans", 20, "bold"),
-)
-instruction_label.pack(padx=20, pady=20)
+    root = tk.Tk()
+    root.title("Time for a break!")
+    root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+    root.protocol("WM_DELETE_WINDOW", quit_app)
 
-image_label = tk.Label(root)
-image_label.pack(pady=15)
+    instruction_label = tk.Label(
+        root,
+        font=("Sans", 20, "bold"),
+    )
+    instruction_label.pack(padx=20, pady=20)
 
-instruction = tk.Label(root, text="How many minutes until the next break?")
-instruction.pack(pady=10)
+    image_label = tk.Label(root)
+    image_label.pack(pady=15)
 
-time_entry = tk.Entry(root)
-time_entry.pack()
+    instruction = tk.Label(root, text="How many minutes until the next break?")
+    instruction.pack(pady=10)
 
-start_button = tk.Button(root, text="Start Timer", command=start_timer)
-# We skip the parenthesis when calling start_timer as we don't want to execute
-# it immediately
-# This is unline the way we use get_quote or get_image since we need to
-# execute those function immediately and use their values
-start_button.pack(pady=20)
+    time_entry = tk.Entry(root)
+    time_entry.pack()
 
-control_status_button = tk.Button(
-    root,
-    command=toggle_enabled,
-)
+    start_button = tk.Button(root, text="Start Timer", command=start_timer)
+    # We skip the parenthesis when calling start_timer as we don't want to
+    # execute it immediately
+    # This is unline the way we use get_quote or get_image since we need to
+    # execute those function immediately and use their values
+    start_button.pack(pady=20)
 
-control_status_button.pack(pady=10)
+    control_status_button = tk.Button(
+        root,
+        command=toggle_enabled,
+    )
 
-update_control_button()
+    control_status_button.pack(pady=10)
 
-root.mainloop()
+    update_control_button()
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

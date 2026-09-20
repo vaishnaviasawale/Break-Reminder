@@ -1,0 +1,21 @@
+             ┌──────────────┐
+             │ Break        │
+             │ Reminder     │
+             └──────┬───────┘
+                    │
+          ┌─────────┴─────────┐
+          ↓                   ↓
+   Reminder enabled?    Autostart enabled?
+          │                   │
+    config.json         .desktop file
+
+They are two independent settings. Changing one must never silently change the other.
+
+| Autostart | Reminder  | What we'll verify                           |
+| --------- | --------- | ------------------------------------------- |
+| OFF       | OFF       | Both remain off                             |
+| OFF       | ON        | Reminder can be enabled independently       |
+| ON        | OFF       | Autostart doesn't enable reminder           |
+| ON        | ON        | Both can be enabled                         |
+| ON → OFF  | unchanged | Disabling autostart doesn't affect reminder |
+| OFF → ON  | unchanged | Enabling autostart doesn't affect reminder  |

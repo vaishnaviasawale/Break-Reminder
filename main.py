@@ -159,17 +159,14 @@ def toggle_enabled():
 
 
 def timer_finished():
-    try:
-        if not config.is_enabled():
-            return
-        update_content()
-        root.deiconify()  # Make the window visible again
+    if not config.is_enabled():
+        root.deiconify()  # Make window visible again
         enable_inputs()
-    except Exception as e:
-        print(f"Error while showing break: {e}")
+        return
 
-        root.deiconify()
-        enable_inputs()
+    update_content()
+    root.deiconify()
+    enable_inputs()
 
 
 def start_timer():

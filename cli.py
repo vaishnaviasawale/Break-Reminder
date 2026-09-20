@@ -1,4 +1,4 @@
-import sys # System module to interact with the Python runtime environment (interpreters, command-line arguments, etc.)
+import sys  # System module to interact with the Python runtime environment (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
 import config
@@ -11,8 +11,9 @@ MAIN = PROJECT_DIR / "main.py"
 AUTOSTART_DIR = Path.home() / ".config" / "autostart"
 
 DESKTOP_FILE = AUTOSTART_DIR / "break-reminder.desktop"
-# .desktop files are plain text configuration files that act as application shortcuts and metadata. They dictate how a program appears in your application menu, which icon it uses, and how it launches. 
+# .desktop files are plain text configuration files that act as application shortcuts and metadata. They dictate how a program appears in your application menu, which icon it uses, and how it launches.
 # GNOME checks ~/.config/autostart/ every time there is a log in. Every .desktop file inside gets launched.
+
 
 def ensure_autostart_dir():
     AUTOSTART_DIR.mkdir(
@@ -20,6 +21,7 @@ def ensure_autostart_dir():
         exist_ok=True,
     )
     # Creates ~/.config/autostart if it doesnt exist
+
 
 def enable_autostart():
     # Register my application with GNOME so the application launches automatically.
@@ -39,6 +41,7 @@ X-GNOME-Autostart-enabled=true
 
     print("Break Reminder enabled.")
 
+
 def disable_autostart():
     if DESKTOP_FILE.exists():
         DESKTOP_FILE.unlink()
@@ -47,12 +50,14 @@ def disable_autostart():
     else:
         print("Break reminder utostart is already disabled.")
 
+
 def status_autostart():
 
     if DESKTOP_FILE.exists():
         print("Break reminder autostart is enabled")
     else:
         print("Break reminder autostart is disabled")
+
 
 # Command-line argument handling
 if len(sys.argv) < 2:
@@ -79,8 +84,8 @@ if command == "enable":
     print("Break reminder enabled.")
 
 elif command == "disable":
-    if len(sys.argv) != 2: 
-        print("Break reminder usage: python cli.py disable") 
+    if len(sys.argv) != 2:
+        print("Break reminder usage: python cli.py disable")
         raise SystemExit(1)
 
     config.disable()

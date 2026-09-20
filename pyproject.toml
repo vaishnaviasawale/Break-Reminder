@@ -9,3 +9,10 @@ dependencies = [
     "pillow>=12.3.0",
     "requests>=2.34.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.8",
+]
+[tool.ruff]
+line-length = 80

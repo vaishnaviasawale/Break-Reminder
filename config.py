@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "enabled": True,
 }
 
+
 def ensure_config_exists():
     CONFIG_DIR.mkdir(
         parents=True,
@@ -24,17 +25,17 @@ def ensure_config_exists():
             # json.dumps is different from json.dump
             # It turns config = {"enabled": True}
             # {"enabled": true} as a string
-        )    
+        )
+
 
 def load_config():
     ensure_config_exists()
 
-    return json.loads(
-        CONFIG_FILE.read_text()
-    )
+    return json.loads(CONFIG_FILE.read_text())
     # json.loads is different from json.load
     # It reads the JSON {"enabled": true} to
     # {"enabled": True}
+
 
 def save_config(config):
     ensure_config_exists()
@@ -46,19 +47,23 @@ def save_config(config):
         )
     )
 
+
 def is_enabled():
     config = load_config()
     return config["enabled"]
+
 
 def enable():
     config = load_config()
     config["enabled"] = True
     save_config(config)
 
+
 def disable():
     config = load_config()
     config["enabled"] = False
     save_config(config)
+
 
 def status():
     if is_enabled():

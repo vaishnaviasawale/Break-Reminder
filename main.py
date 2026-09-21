@@ -12,7 +12,8 @@ import config
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
 
-ASSETS_DIR = Path("assets")
+PROJECT_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = PROJECT_DIR / "assets"
 
 FALLBACK_IMAGES = list(ASSETS_DIR.glob("fallback_*.png"))
 
@@ -85,6 +86,16 @@ def get_duckduckgo_image(topic):
     return image, topic
 
 
+def get_fallback_image():
+    if not FALLBACK_IMAGES:
+        return None
+    # If no fallback image exists, show only the text
+
+    fallback_image = random.choice(FALLBACK_IMAGES)
+
+    return Image.open(fallback_image), "Time for a break!"
+
+
 def get_image():
     try:
         sources = ["xkcd"] + TOPICS
@@ -96,9 +107,12 @@ def get_image():
             image, title = get_duckduckgo_image(source)
 
     except (requests.RequestException, RuntimeError, OSError):
-        fallback_image = random.choice(FALLBACK_IMAGES)
-        image = Image.open(fallback_image)
-        title = "Time for a break!"
+        fallback = get_fallback_image()
+
+        if fallback is None:
+            return None, "Time for a break!"
+
+        image, title = fallback
 
     image.thumbnail((450, 300))
 
@@ -124,6 +138,11 @@ def update_content():
         text=title,
         font=("Sans", 18, "bold"),
     )
+
+    if photo is None:
+        image_label.config(image="")
+        image_label.image = None
+        return
 
     image_label.config(image=photo)
 

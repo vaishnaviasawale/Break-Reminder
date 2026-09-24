@@ -1,21 +1,35 @@
 [project]
 name = "break-reminder"
 version = "0.1.0"
-description = "Add your description here"
+description = "A simple desktop break reminder"
 readme = "README.md"
 requires-python = ">=3.14"
+
 dependencies = [
     "ddgs>=9.16.0",
     "pillow>=12.3.0",
     "requests>=2.34.2",
 ]
 
+[project.scripts]
+break-reminder = "break_reminder.main:main"
+break-reminder-cli = "break_reminder.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/break_reminder"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]
+
 [tool.ruff]
 line-length = 80
+
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]

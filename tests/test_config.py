@@ -1,4 +1,4 @@
-import config
+from break_reminder import config
 
 
 def test_default_config_is_enabled(tmp_path, monkeypatch):

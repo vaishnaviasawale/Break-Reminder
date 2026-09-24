@@ -1,4 +1,4 @@
-import cli
+from break_reminder import cli
 
 
 def test_autostart_is_disabled_by_default(tmp_path, monkeypatch):

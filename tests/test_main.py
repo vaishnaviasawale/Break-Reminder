@@ -1,4 +1,4 @@
-import main
+from break_reminder import main
 import requests
 
 

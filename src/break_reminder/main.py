@@ -7,7 +7,7 @@ import requests
 from ddgs import DDGS
 from PIL import Image, ImageTk
 
-import config
+from break_reminder import config
 
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700

@@ -2,7 +2,7 @@ import sys  # System module to interact with the Python runtime environment
 # (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
-import config
+from break_reminder import config
 
 PROJECT_DIR = Path(__file__).resolve().parent
 PYTHON = PROJECT_DIR / ".venv" / "bin" / "python"

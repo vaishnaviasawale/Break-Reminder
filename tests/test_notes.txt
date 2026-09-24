@@ -19,3 +19,49 @@ They are two independent settings. Changing one must never silently change the o
 | ON        | ON        | Both can be enabled                         |
 | ON → OFF  | unchanged | Disabling autostart doesn't affect reminder |
 | OFF → ON  | unchanged | Enabling autostart doesn't affect reminder  |
+
+
+# TEST THESE MANUALLY:
+1. Normal timer
+Start a 1-minute timer.
+Confirm the window hides.
+Confirm the break appears after the timer.
+Confirm controls become usable again.
+
+2. Reminder disabled
+Disable the reminder.
+Start a timer.
+Confirm no break content appears when it finishes.
+Re-enable the reminder.
+
+3. Screen lock
+Start a short timer.
+Lock the session.
+Wait for the timer to expire.
+Unlock and check the result.
+
+4. Suspend/resume
+Start a short timer.
+Suspend Fedora.
+Stay suspended past the timer deadline.
+Resume and observe what happens.
+
+5. Reboot/autostart
+Enable autostart.
+Reboot Fedora.
+Confirm Break Reminder starts automatically.
+Check what happens to a timer that was running before reboot.
+
+6. Shutdown/startup
+Start a timer.
+Shut down completely.
+Start Fedora again.
+Confirm the expected behavior.
+
+7. Autostart controls
+Test:
+uv run python cli.py autostart status
+uv run python cli.py autostart enable
+uv run python cli.py autostart status
+uv run python cli.py autostart disable
+uv run python cli.py autostart status

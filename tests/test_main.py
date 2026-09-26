@@ -1,5 +1,6 @@
-from break_reminder import main
 import requests
+
+from break_reminder import main
 
 
 def test_start_timer_does_nothing_when_reminder_disabled(

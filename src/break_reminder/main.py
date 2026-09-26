@@ -1,5 +1,4 @@
 import random
-import sys
 import tkinter as tk
 from io import BytesIO
 from pathlib import Path
@@ -107,7 +106,7 @@ def get_image():
         else:
             image, title = get_duckduckgo_image(source)
 
-    except (requests.RequestException, RuntimeError, OSError):
+    except requests.RequestException, RuntimeError, OSError:
         fallback = get_fallback_image()
 
         if fallback is None:
@@ -222,28 +221,6 @@ def quit_app():
 
 
 def main():
-    if len(sys.argv) > 1:
-        if sys.argv[1] in ("--help", "-h"):
-            print("Usage: break-reminder")
-            print()
-            print("Launch the Break Reminder desktop application.")
-            print()
-            print("Options:")
-            print("  -h, --help    Show this help message")
-            print()
-            print("Command-line controls:")
-            print("  break-reminder-cli status")
-            print("  break-reminder-cli enable")
-            print("  break-reminder-cli disable")
-            print("  break-reminder-cli autostart status")
-            print("  break-reminder-cli autostart enable")
-            print("  break-reminder-cli autostart disable")
-            return
-
-        print(f"Unknown argument: {sys.argv[1]}")
-        print("Run 'break-reminder --help' for usage.")
-        return
-    
     global root
     global instruction_label
     global image_label

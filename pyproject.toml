@@ -12,8 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-break-reminder = "break_reminder.main:main"
-break-reminder-cli = "break_reminder.cli:main"
+break-reminder = "break_reminder.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,12 +1,11 @@
+import shutil
 import sys  # System module to interact with the Python runtime environment
 # (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
 from break_reminder import config
+from break_reminder import main as gui
 
-PROJECT_DIR = Path(__file__).resolve().parent
-PYTHON = PROJECT_DIR / ".venv" / "bin" / "python"
-MAIN = PROJECT_DIR / "main.py"
 
 # Users home directory is Path.home()
 AUTOSTART_DIR = Path.home() / ".config" / "autostart"
@@ -34,18 +33,29 @@ def enable_autostart():
     # when the user logs in
     ensure_autostart_dir()
 
+    executable = shutil.which("break-reminder")
+
+    if executable is None:
+        print("Could not find the break-reminder executable.")
+        raise SystemExit(1)
+
     desktop_contents = f"""\
 [Desktop Entry]
 Type=Application
 Name=Break Reminder
-Exec={PYTHON} {MAIN}
+Exec={executable}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 """
 
     DESKTOP_FILE.write_text(desktop_contents)
 
-    print("Break Reminder enabled.")
+    print("Break Reminder autostart enabled.")
+
+
+# Instead of creating: Exec=/home/.../Projects/break-reminder/.venv/bin/python
+# /home/.../Projects/break-reminder/main.py
+# It will create: Exec=/home/vaishnavi-asawale/.local/bin/break-reminder
 
 
 def disable_autostart():
@@ -69,51 +79,61 @@ def status_autostart():
 
 def main():
     # Command-line argument handling
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print()
-        print("  python cli.py enable")
-        print("  python cli.py disable")
-        print("  python cli.py status")
-        print()
-        print("  python cli.py autostart enable")
-        print("  python cli.py autostart disable")
-        print("  python cli.py autostart status")
-        raise SystemExit(1)
+    if len(sys.argv) == 1:
+        gui.main()
+        return
 
     command = sys.argv[1]
 
-    # Reminder configuration
+    if command in ("--help", "-h"):
+        print("Usage:")
+        print("  break-reminder")
+        print("  break-reminder <command>")
+        print()
+        print("Commands:")
+        print("  enable")
+        print("  disable")
+        print("  status")
+        print("  autostart enable")
+        print("  autostart disable")
+        print("  autostart status")
+        print()
+        print("Run 'break-reminder' without a command to open the app.")
+        return
+
     if command == "enable":
         if len(sys.argv) != 2:
-            print("Break reminder usage: python cli.py enable")
+            print("Usage: break-reminder enable")
             raise SystemExit(1)
 
         config.enable()
         print("Break reminder enabled.")
+        return
 
-    elif command == "disable":
+    if command == "disable":
         if len(sys.argv) != 2:
-            print("Break reminder usage: python cli.py disable")
+            print("Usage: break-reminder disable")
             raise SystemExit(1)
 
         config.disable()
         print("Break reminder disabled.")
+        return
 
-    elif command == "status":
+    if command == "status":
         if len(sys.argv) != 2:
-            print("Break reminder usage: python cli.py status")
+            print("Usage: break-reminder status")
             raise SystemExit(1)
 
         config.status()
+        return
 
     # Autostart configuration
-    elif command == "autostart":
+    if command == "autostart":
         if len(sys.argv) != 3:
             print("Usage:")
-            print("  python cli.py autostart enable")
-            print("  python cli.py autostart disable")
-            print("  python cli.py autostart status")
+            print("  break-reminder autostart enable")
+            print("  break-reminder autostart disable")
+            print("  break-reminder autostart status")
             raise SystemExit(1)
 
         subcommand = sys.argv[2]
@@ -125,11 +145,14 @@ def main():
         elif subcommand == "status":
             status_autostart()
         else:
-            print("Invalid subcommand.")
+            print(f"Unknown autostart command: {subcommand}")
             raise SystemExit(1)
-    else:
-        print("Unknown command.")
-        raise SystemExit(1)
+
+        return
+
+    print(f"Unknown command: {command}")
+    print("Run 'break-reminder --help' for usage.")
+    raise SystemExit(1)
 
 
 if __name__ == "__main__":

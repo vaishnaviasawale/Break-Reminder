@@ -65,3 +65,7 @@ uv run python cli.py autostart enable
 uv run python cli.py autostart status
 uv run python cli.py autostart disable
 uv run python cli.py autostart status
+
+8. Only 1 GUI should be active at a time
+
+9. Updating the timer

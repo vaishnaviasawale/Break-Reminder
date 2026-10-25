@@ -217,7 +217,47 @@ def test_help_lists_commands(monkeypatch, capsys, flag):
     output = capsys.readouterr().out
 
     assert "Usage:" in output
+    assert "quit" in output
     assert "autostart enable" in output
+
+
+def test_enable_and_disable_notify_running_gui(
+    isolated_paths,
+    monkeypatch,
+):
+    sent = []
+
+    monkeypatch.setattr(
+        cli,
+        "send_command",
+        lambda command: sent.append(command) or True,
+    )
+
+    run_cli(monkeypatch, "disable")
+    run_cli(monkeypatch, "enable")
+
+    assert sent == ["config-changed", "config-changed"]
+
+
+def test_quit_stops_running_gui(isolated_paths, monkeypatch, capsys):
+    sent = []
+
+    monkeypatch.setattr(
+        cli,
+        "send_command",
+        lambda command: sent.append(command) or True,
+    )
+
+    run_cli(monkeypatch, "quit")
+
+    assert sent == ["quit"]
+    assert "stopped" in capsys.readouterr().out
+
+
+def test_quit_when_gui_not_running(isolated_paths, monkeypatch, capsys):
+    run_cli(monkeypatch, "quit")
+
+    assert "not running" in capsys.readouterr().out
 
 
 def test_disable_and_enable_commands(isolated_paths, monkeypatch, capsys):
@@ -257,6 +297,7 @@ def test_autostart_commands(isolated_paths, monkeypatch, capsys):
         ("enable", "extra"),
         ("disable", "extra"),
         ("status", "extra"),
+        ("quit", "extra"),
         ("autostart",),
         ("autostart", "bogus"),
         ("autostart", "enable", "extra"),

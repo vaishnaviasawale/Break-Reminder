@@ -183,7 +183,31 @@ def toggle_enabled():
     else:
         config.enable()
 
+    apply_config()
+
+
+def apply_config():
+    # Called when the reminder is switched on or off, either from the button
+    # or from "break-reminder enable/disable" in the terminal. Disabling stops
+    # the running timer so no break pops up later.
+    if not config.is_enabled():
+        cancel_timer()
+
     update_control_button()
+
+
+def cancel_timer():
+    global timer_id
+    global timer_end_time
+
+    if timer_id is not None:
+        root.after_cancel(timer_id)
+        timer_id = None
+
+    cancel_refresh_loop()
+
+    timer_end_time = None
+    update_timer_display()
 
 
 def timer_finished():
@@ -194,8 +218,7 @@ def timer_finished():
     timer_end_time = None
 
     if not config.is_enabled():
-        root.deiconify()  # Make window visible again
-        return
+        return  # Stay hidden: the reminder was switched off
 
     update_content()
     root.deiconify()
@@ -262,16 +285,7 @@ def start_timer():
 
 
 def quit_app():
-    global timer_id
-    global timer_end_time
-
-    if timer_id is not None:
-        root.after_cancel(timer_id)
-        timer_id = None
-
-    cancel_refresh_loop()
-
-    timer_end_time = None
+    cancel_timer()
 
     # SOCKET_FILE.unlink(missing_ok=True)
     # Instead of using the socket itself as the rough indication of whether an
@@ -401,6 +415,10 @@ def handle_commands():
 
         if command == "show":
             root.after(0, show_window)
+        elif command == "config-changed":
+            root.after(0, apply_config)
+        elif command == "quit":
+            root.after(0, quit_app)
 
 
 def show_existing_app():

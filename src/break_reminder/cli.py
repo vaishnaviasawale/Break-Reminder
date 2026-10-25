@@ -29,15 +29,24 @@ def ensure_runtime_dir():
     )
 
 
-def show_existing_app():
+def send_command(command):
+    # Sends a command to the running GUI. Returns False if no GUI is running.
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             sock.connect(str(SOCKET_FILE))
-            sock.sendall(b"show")
+            sock.sendall(command.encode())
         return True
     except (FileNotFoundError, ConnectionRefusedError):
         SOCKET_FILE.unlink(missing_ok=True)
         return False
+    except OSError:
+        # Any other socket problem: treat the GUI as unreachable rather than
+        # crashing after the config has already been saved.
+        return False
+
+
+def show_existing_app():
+    return send_command("show")
 
 
 def launch_gui():
@@ -150,6 +159,7 @@ def main():
         print("  enable")
         print("  disable")
         print("  status")
+        print("  quit")
         print("  autostart enable")
         print("  autostart disable")
         print("  autostart status")
@@ -163,6 +173,7 @@ def main():
             raise SystemExit(1)
 
         config.enable()
+        send_command("config-changed")
         print("Break reminder enabled.")
         return
 
@@ -172,6 +183,7 @@ def main():
             raise SystemExit(1)
 
         config.disable()
+        send_command("config-changed")
         print("Break reminder disabled.")
         return
 
@@ -181,6 +193,17 @@ def main():
             raise SystemExit(1)
 
         config.status()
+        return
+
+    if command == "quit":
+        if len(sys.argv) != 2:
+            print("Usage: break-reminder quit")
+            raise SystemExit(1)
+
+        if send_command("quit"):
+            print("Break reminder stopped.")
+        else:
+            print("Break reminder is not running.")
         return
 
     # Autostart configuration

@@ -1,3 +1,4 @@
+import socket
 import threading
 import time
 
@@ -175,7 +176,7 @@ def test_timer_finished_does_not_show_break_if_disabled(
     main.timer_finished()
 
     assert content_updated is False
-    assert window_restored is True
+    assert window_restored is False
     assert main.timer_id is None
     assert main.timer_end_time is None
 
@@ -719,6 +720,12 @@ def test_toggle_enabled_flips_reminder_and_button(
         button,
         raising=False,
     )
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        FakeLabel(),
+        raising=False,
+    )
 
     main.toggle_enabled()
 
@@ -746,6 +753,12 @@ def test_quit_app_cancels_timer_and_destroys_window(monkeypatch):
             destroyed = True
 
     monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        FakeLabel(),
+        raising=False,
+    )
 
     main.timer_id = "timer-id"
     main.timer_end_time = object()
@@ -855,6 +868,48 @@ def test_countdown_loop_stops_when_timer_ends(monkeypatch, scheduler):
     assert main.refresh_id is None
 
 
+def test_disabling_cancels_running_timer(monkeypatch, scheduler):
+    set_entry(monkeypatch, "10")
+    main.start_timer()
+
+    button = FakeLabel()
+    monkeypatch.setattr(
+        main,
+        "control_status_button",
+        button,
+        raising=False,
+    )
+    monkeypatch.setattr(main.config, "is_enabled", lambda: False)
+
+    main.apply_config()
+
+    assert scheduler.pending == {}
+    assert main.timer_id is None
+    assert main.timer_end_time is None
+    assert main.timer_status_label.text == ""
+    assert button.text == "Enable Reminder"
+
+
+def test_enabling_keeps_running_timer(monkeypatch, scheduler):
+    set_entry(monkeypatch, "10")
+    main.start_timer()
+    running_timer = main.timer_id
+
+    button = FakeLabel()
+    monkeypatch.setattr(
+        main,
+        "control_status_button",
+        button,
+        raising=False,
+    )
+
+    main.apply_config()
+
+    assert main.timer_id == running_timer
+    assert main.timer_finished in scheduler.pending.values()
+    assert button.text == "Disable Reminder"
+
+
 def test_show_window_restores_and_focuses_window(monkeypatch):
     calls = []
 
@@ -934,15 +989,23 @@ def test_show_existing_app_returns_false_without_server(
     assert main.show_existing_app() is False
 
 
-def test_show_command_reaches_running_gui(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    ("command", "handler"),
+    [
+        (b"show", "show_window"),
+        (b"config-changed", "apply_config"),
+        (b"quit", "quit_app"),
+    ],
+)
+def test_command_reaches_running_gui(monkeypatch, tmp_path, command, handler):
     socket_file = tmp_path / "br.sock"
-    shown = threading.Event()
+    received = threading.Event()
+    calls = []
 
     class FakeRoot:
         def after(self, delay, callback):
-            assert delay == 0
-            assert callback == main.show_window
-            shown.set()
+            calls.append((delay, callback))
+            received.set()
 
     monkeypatch.setattr(main, "RUNTIME_DIR", tmp_path)
     monkeypatch.setattr(main, "SOCKET_FILE", socket_file)
@@ -952,8 +1015,15 @@ def test_show_command_reaches_running_gui(monkeypatch, tmp_path):
 
     # The server thread needs a moment to bind and listen.
     deadline = time.monotonic() + 2
-    while not main.show_existing_app():
-        assert time.monotonic() < deadline, "command server never started"
-        time.sleep(0.01)
+    while True:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.connect(str(socket_file))
+                sock.sendall(command)
+            break
+        except OSError:
+            assert time.monotonic() < deadline, "command server never started"
+            time.sleep(0.01)
 
-    assert shown.wait(timeout=2)
+    assert received.wait(timeout=2)
+    assert calls == [(0, getattr(main, handler))]

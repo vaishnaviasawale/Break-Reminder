@@ -11,11 +11,13 @@ from break_reminder import main
 def reset_timer_state():
     main.timer_id = None
     main.timer_end_time = None
+    main.refresh_id = None
 
     yield
 
     main.timer_id = None
     main.timer_end_time = None
+    main.refresh_id = None
 
 
 class FakeLabel:
@@ -736,7 +738,8 @@ def test_quit_app_cancels_timer_and_destroys_window(monkeypatch):
     class FakeRoot:
         def after_cancel(self, timer_id):
             nonlocal cancelled_timer
-            cancelled_timer = timer_id
+            if timer_id == "timer-id":
+                cancelled_timer = timer_id
 
         def destroy(self):
             nonlocal destroyed
@@ -753,6 +756,103 @@ def test_quit_app_cancels_timer_and_destroys_window(monkeypatch):
     assert destroyed is True
     assert main.timer_id is None
     assert main.timer_end_time is None
+
+
+class FakeScheduler:
+    # Behaves like Tk's after()/after_cancel(): keeps every pending callback
+    # until it runs or is cancelled.
+    def __init__(self):
+        self.pending = {}
+        self.next_id = 0
+
+    def after(self, delay, callback):
+        self.next_id += 1
+        after_id = f"after#{self.next_id}"
+        self.pending[after_id] = callback
+        return after_id
+
+    def after_cancel(self, after_id):
+        self.pending.pop(after_id, None)
+
+    def withdraw(self):
+        pass
+
+    def destroy(self):
+        pass
+
+    def tick(self):
+        # Run the countdown refreshes that are due; leave the break alone.
+        due = {
+            after_id: callback
+            for after_id, callback in self.pending.items()
+            if callback == main.refresh_timer_display
+        }
+        for after_id, callback in due.items():
+            del self.pending[after_id]
+            callback()
+
+    def count(self, callback):
+        return list(self.pending.values()).count(callback)
+
+
+@pytest.fixture
+def scheduler(monkeypatch):
+    monkeypatch.setattr(main.config, "is_enabled", lambda: True)
+    monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        FakeLabel(),
+        raising=False,
+    )
+
+    scheduler = FakeScheduler()
+    monkeypatch.setattr(main, "root", scheduler, raising=False)
+
+    return scheduler
+
+
+def set_entry(monkeypatch, text):
+    class FakeEntry:
+        def get(self):
+            return text
+
+    monkeypatch.setattr(main, "time_entry", FakeEntry(), raising=False)
+
+
+def test_replacing_timer_keeps_one_countdown_loop(monkeypatch, scheduler):
+    for minutes in ["20", "10", "5"]:
+        set_entry(monkeypatch, minutes)
+        main.start_timer()
+
+        # Let a couple of seconds tick by between changes.
+        scheduler.tick()
+        scheduler.tick()
+
+    assert scheduler.count(main.refresh_timer_display) == 1
+
+
+def test_quit_app_stops_countdown_loop(monkeypatch, scheduler):
+    set_entry(monkeypatch, "10")
+    main.start_timer()
+
+    assert scheduler.count(main.refresh_timer_display) == 1
+
+    main.quit_app()
+
+    assert scheduler.pending == {}
+    assert main.refresh_id is None
+
+
+def test_countdown_loop_stops_when_timer_ends(monkeypatch, scheduler):
+    set_entry(monkeypatch, "10")
+    main.start_timer()
+
+    main.timer_end_time = None
+    scheduler.tick()
+
+    assert scheduler.count(main.refresh_timer_display) == 0
+    assert main.refresh_id is None
 
 
 def test_show_window_restores_and_focuses_window(monkeypatch):

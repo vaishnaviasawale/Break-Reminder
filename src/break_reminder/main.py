@@ -39,6 +39,8 @@ timer_id = None  # If a timer is already running and I start another timer,
 # cancel the old timer. To keep track, we need a timer_id
 timer_end_time = None
 timer_status_label = None
+refresh_id = None  # The once-a-second countdown update also needs an id, so
+# the old countdown can be cancelled when a new timer is started
 
 
 def get_xkcd_image():
@@ -239,6 +241,8 @@ def start_timer():
     if timer_id is not None:
         root.after_cancel(timer_id)
 
+    cancel_refresh_loop()
+
     timer_end_time = datetime.now() + timedelta(
         minutes=minutes,
     )
@@ -264,6 +268,8 @@ def quit_app():
     if timer_id is not None:
         root.after_cancel(timer_id)
         timer_id = None
+
+    cancel_refresh_loop()
 
     timer_end_time = None
 
@@ -301,15 +307,26 @@ def update_timer_display():
 
 
 def refresh_timer_display():
+    global refresh_id
+
     if timer_end_time is None:
+        refresh_id = None
         return
 
     update_timer_display()
 
-    root.after(
+    refresh_id = root.after(
         1000,
         refresh_timer_display,
     )
+
+
+def cancel_refresh_loop():
+    global refresh_id
+
+    if refresh_id is not None:
+        root.after_cancel(refresh_id)
+        refresh_id = None
 
 
 def start_command_server():

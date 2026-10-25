@@ -1,9 +1,29 @@
-import fcntl
+import threading
+import time
+
+import pytest
 import requests
 
 from break_reminder import main
 
-LOCK_FILE = RUNTIME_DIR / "break-reminder.lock"
+
+@pytest.fixture(autouse=True)
+def reset_timer_state():
+    main.timer_id = None
+    main.timer_end_time = None
+
+    yield
+
+    main.timer_id = None
+    main.timer_end_time = None
+
+
+class FakeLabel:
+    def __init__(self):
+        self.text = None
+
+    def config(self, **kwargs):
+        self.text = kwargs.get("text")
 
 
 def test_start_timer_does_nothing_when_reminder_disabled(
@@ -58,10 +78,6 @@ def test_start_timer_schedules_timer_when_enabled(
         def get(self):
             return "10"
 
-    class FakeLabel:
-        def config(self, **kwargs):
-            pass
-
     monkeypatch.setattr(
         main,
         "time_entry",
@@ -83,24 +99,22 @@ def test_start_timer_schedules_timer_when_enabled(
         raising=False,
     )
 
-    scheduled_delay = None
-    scheduled_callback = None
+    # start_timer() schedules the break and also starts the once-a-second
+    # countdown refresh, so record every after() call.
+    scheduled = []
+    withdrawn = False
 
     class FakeRoot:
         def after(self, delay, callback):
-            nonlocal scheduled_delay
-            nonlocal scheduled_callback
-
-            scheduled_delay = delay
-            scheduled_callback = callback
-
-            return "timer-id"
+            scheduled.append((delay, callback))
+            return f"timer-id-{len(scheduled)}"
 
         def after_cancel(self, timer_id):
             pass
 
         def withdraw(self):
-            pass
+            nonlocal withdrawn
+            withdrawn = True
 
     monkeypatch.setattr(
         main,
@@ -111,10 +125,11 @@ def test_start_timer_schedules_timer_when_enabled(
 
     main.start_timer()
 
-    assert scheduled_delay == 10 * 60 * 1000
-    assert scheduled_callback == main.timer_finished
-    assert main.timer_id == "timer-id"
+    assert scheduled[0] == (10 * 60 * 1000, main.timer_finished)
+    assert (1000, main.refresh_timer_display) in scheduled
+    assert main.timer_id == "timer-id-1"
     assert main.timer_end_time is not None
+    assert withdrawn is True
 
 
 def test_timer_finished_does_not_show_break_if_disabled(
@@ -242,6 +257,41 @@ def test_get_image_uses_online_image(monkeypatch):
     assert title == "XKCD title"
 
 
+def test_get_image_uses_duckduckgo_for_topics(monkeypatch):
+    class FakeImage:
+        def thumbnail(self, size):
+            pass
+
+    requested_topics = []
+
+    def fake_duckduckgo_image(topic):
+        requested_topics.append(topic)
+        return FakeImage(), topic
+
+    monkeypatch.setattr(
+        main,
+        "get_duckduckgo_image",
+        fake_duckduckgo_image,
+    )
+
+    monkeypatch.setattr(
+        main.random,
+        "choice",
+        lambda sources: "puppies",
+    )
+
+    monkeypatch.setattr(
+        main.ImageTk,
+        "PhotoImage",
+        lambda image: object(),
+    )
+
+    _, title = main.get_image()
+
+    assert requested_topics == ["puppies"]
+    assert title == "puppies"
+
+
 def test_get_image_uses_fallback_when_online_image_fails(
     monkeypatch,
 ):
@@ -316,6 +366,21 @@ def test_get_image_returns_text_only_when_no_fallback_exists(
     assert title == "Time for a break!"
 
 
+def test_get_fallback_image_returns_none_without_assets(monkeypatch):
+    monkeypatch.setattr(main, "FALLBACK_IMAGES", [])
+
+    assert main.get_fallback_image() is None
+
+
+def test_fallback_images_are_packaged():
+    assert main.FALLBACK_IMAGES
+
+    image, title = main.get_fallback_image()
+
+    assert image.size[0] > 0
+    assert title == "Time for a break!"
+
+
 def test_update_content_handles_missing_image(monkeypatch):
     class FakeInstructionLabel:
         def __init__(self):
@@ -365,8 +430,21 @@ def test_update_content_handles_missing_image(monkeypatch):
     assert image_label.image is None
 
 
-def test_start_timer_shows_error_for_empty_input(
+@pytest.mark.parametrize(
+    ("entry_text", "expected_error"),
+    [
+        ("", "Please enter the number of minutes."),
+        ("   ", "Please enter the number of minutes."),
+        ("abc", "Please enter a whole number of minutes."),
+        ("1.5", "Please enter a whole number of minutes."),
+        ("0", "Please enter a number greater than 0."),
+        ("-5", "Please enter a number greater than 0."),
+    ],
+)
+def test_start_timer_shows_error_for_invalid_input(
     monkeypatch,
+    entry_text,
+    expected_error,
 ):
     monkeypatch.setattr(
         main.config,
@@ -376,14 +454,7 @@ def test_start_timer_shows_error_for_empty_input(
 
     class FakeEntry:
         def get(self):
-            return ""
-
-    class FakeLabel:
-        def __init__(self):
-            self.text = None
-
-        def config(self, **kwargs):
-            self.text = kwargs.get("text")
+            return entry_text
 
     error_label = FakeLabel()
 
@@ -403,14 +474,12 @@ def test_start_timer_shows_error_for_empty_input(
 
     main.start_timer()
 
-    assert error_label.text == (
-        "Please enter the number of minutes."
-    )
+    assert error_label.text == expected_error
+    assert main.timer_id is None
+    assert main.timer_end_time is None
 
 
-def test_start_timer_shows_error_for_non_number(
-    monkeypatch,
-):
+def test_start_timer_clears_previous_error(monkeypatch):
     monkeypatch.setattr(
         main.config,
         "is_enabled",
@@ -419,79 +488,32 @@ def test_start_timer_shows_error_for_non_number(
 
     class FakeEntry:
         def get(self):
-            return "abc"
-
-    class FakeLabel:
-        def __init__(self):
-            self.text = None
-
-        def config(self, **kwargs):
-            self.text = kwargs.get("text")
+            return " 5 "
 
     error_label = FakeLabel()
+    error_label.text = "Please enter the number of minutes."
 
+    class FakeRoot:
+        def after(self, delay, callback):
+            return "timer-id"
+
+        def withdraw(self):
+            pass
+
+    monkeypatch.setattr(main, "time_entry", FakeEntry(), raising=False)
+    monkeypatch.setattr(main, "error_label", error_label, raising=False)
     monkeypatch.setattr(
         main,
-        "time_entry",
-        FakeEntry(),
+        "timer_status_label",
+        FakeLabel(),
         raising=False,
     )
-
-    monkeypatch.setattr(
-        main,
-        "error_label",
-        error_label,
-        raising=False,
-    )
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
 
     main.start_timer()
 
-    assert error_label.text == (
-        "Please enter a whole number of minutes."
-    )
-
-
-def test_start_timer_shows_error_for_zero(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        main.config,
-        "is_enabled",
-        lambda: True,
-    )
-
-    class FakeEntry:
-        def get(self):
-            return "0"
-
-    class FakeLabel:
-        def __init__(self):
-            self.text = None
-
-        def config(self, **kwargs):
-            self.text = kwargs.get("text")
-
-    error_label = FakeLabel()
-
-    monkeypatch.setattr(
-        main,
-        "time_entry",
-        FakeEntry(),
-        raising=False,
-    )
-
-    monkeypatch.setattr(
-        main,
-        "error_label",
-        error_label,
-        raising=False,
-    )
-
-    main.start_timer()
-
-    assert error_label.text == (
-        "Please enter a number greater than 0."
-    )
+    assert error_label.text == ""
+    assert main.timer_id == "timer-id"
 
 
 def test_start_timer_replaces_existing_timer(
@@ -506,10 +528,6 @@ def test_start_timer_replaces_existing_timer(
     class FakeEntry:
         def get(self):
             return "20"
-
-    class FakeLabel:
-        def config(self, **kwargs):
-            pass
 
     monkeypatch.setattr(
         main,
@@ -564,13 +582,6 @@ def test_start_timer_replaces_existing_timer(
 def test_update_timer_display_shows_remaining_time(
     monkeypatch,
 ):
-    class FakeLabel:
-        def __init__(self):
-            self.text = None
-
-        def config(self, **kwargs):
-            self.text = kwargs.get("text")
-
     label = FakeLabel()
 
     monkeypatch.setattr(
@@ -583,36 +594,148 @@ def test_update_timer_display_shows_remaining_time(
     monkeypatch.setattr(
         main,
         "timer_end_time",
-        main.datetime.now() + main.timedelta(
-            minutes=10,
-            seconds=30,
-        ),
+        main.datetime(2026, 1, 1, 14, 5, 0),
+    )
+
+    class FakeDatetime(main.datetime):
+        @classmethod
+        def now(cls):
+            return cls(2026, 1, 1, 13, 54, 30)
+
+    monkeypatch.setattr(main, "datetime", FakeDatetime)
+
+    main.update_timer_display()
+
+    assert label.text == "Next break in 10:30\nBreak at 2:05 PM"
+
+
+def test_update_timer_display_never_shows_negative_time(monkeypatch):
+    label = FakeLabel()
+
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        label,
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        main,
+        "timer_end_time",
+        main.datetime.now() - main.timedelta(minutes=1),
     )
 
     main.update_timer_display()
 
-    assert label.text.startswith("Next break in ")
-    assert "Break at " in label.text
+    assert label.text.startswith("Next break in 0:00\n")
 
 
-def acquire_instance_lock():
-    RUNTIME_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
+def test_update_timer_display_is_blank_without_timer(monkeypatch):
+    label = FakeLabel()
+    label.text = "Next break in 1:00"
+
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        label,
+        raising=False,
     )
 
-    lock_file = LOCK_FILE.open("w")
+    main.update_timer_display()
 
-    try:
-        fcntl.flock(
-            lock_file,
-            fcntl.LOCK_EX | fcntl.LOCK_NB,
-        )
-    except BlockingIOError:
-        lock_file.close()
-        return None
+    assert label.text == ""
 
-    return lock_file
+
+def test_refresh_timer_display_stops_without_timer(monkeypatch):
+    called = False
+
+    class FakeRoot:
+        def after(self, *args):
+            nonlocal called
+            called = True
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+
+    main.refresh_timer_display()
+
+    assert called is False
+
+
+def test_toggle_enabled_flips_reminder_and_button(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(main.config, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(
+        main.config,
+        "CONFIG_FILE",
+        tmp_path / "config.json",
+    )
+
+    button = FakeLabel()
+
+    monkeypatch.setattr(
+        main,
+        "control_status_button",
+        button,
+        raising=False,
+    )
+
+    main.toggle_enabled()
+
+    assert main.config.is_enabled() is False
+    assert button.text == "Enable Reminder"
+
+    main.toggle_enabled()
+
+    assert main.config.is_enabled() is True
+    assert button.text == "Disable Reminder"
+
+
+def test_quit_app_cancels_timer_and_destroys_window(monkeypatch):
+    cancelled_timer = None
+    destroyed = False
+
+    class FakeRoot:
+        def after_cancel(self, timer_id):
+            nonlocal cancelled_timer
+            cancelled_timer = timer_id
+
+        def destroy(self):
+            nonlocal destroyed
+            destroyed = True
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+
+    main.timer_id = "timer-id"
+    main.timer_end_time = object()
+
+    main.quit_app()
+
+    assert cancelled_timer == "timer-id"
+    assert destroyed is True
+    assert main.timer_id is None
+    assert main.timer_end_time is None
+
+
+def test_show_window_restores_and_focuses_window(monkeypatch):
+    calls = []
+
+    class FakeRoot:
+        def deiconify(self):
+            calls.append("deiconify")
+
+        def lift(self):
+            calls.append("lift")
+
+        def focus_force(self):
+            calls.append("focus_force")
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+
+    main.show_window()
+
+    assert calls == ["deiconify", "lift", "focus_force"]
 
 
 def test_instance_lock_allows_only_one_owner(
@@ -642,3 +765,58 @@ def test_instance_lock_allows_only_one_owner(
     assert second_lock is None
 
     first_lock.close()
+
+
+def test_instance_lock_is_released_when_owner_closes(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(main, "RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr(
+        main,
+        "LOCK_FILE",
+        tmp_path / "break-reminder.lock",
+    )
+
+    first_lock = main.acquire_instance_lock()
+    first_lock.close()
+
+    second_lock = main.acquire_instance_lock()
+
+    assert second_lock is not None
+
+    second_lock.close()
+
+
+def test_show_existing_app_returns_false_without_server(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(main, "SOCKET_FILE", tmp_path / "missing.sock")
+
+    assert main.show_existing_app() is False
+
+
+def test_show_command_reaches_running_gui(monkeypatch, tmp_path):
+    socket_file = tmp_path / "br.sock"
+    shown = threading.Event()
+
+    class FakeRoot:
+        def after(self, delay, callback):
+            assert delay == 0
+            assert callback == main.show_window
+            shown.set()
+
+    monkeypatch.setattr(main, "RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr(main, "SOCKET_FILE", socket_file)
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+
+    main.start_command_server()
+
+    # The server thread needs a moment to bind and listen.
+    deadline = time.monotonic() + 2
+    while not main.show_existing_app():
+        assert time.monotonic() < deadline, "command server never started"
+        time.sleep(0.01)
+
+    assert shown.wait(timeout=2)

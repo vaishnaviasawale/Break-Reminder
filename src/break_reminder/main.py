@@ -8,6 +8,7 @@ import threading
 from datetime import datetime, timedelta
 import requests
 from ddgs import DDGS
+from ddgs.exceptions import DDGSException
 from PIL import Image, ImageTk
 
 from break_reminder import config
@@ -118,7 +119,12 @@ def get_image():
         else:
             image, title = get_duckduckgo_image(source)
 
-    except (requests.RequestException, RuntimeError, OSError):
+    except (
+        requests.RequestException,
+        DDGSException,
+        RuntimeError,
+        OSError,
+    ):
         fallback = get_fallback_image()
 
         if fallback is None:

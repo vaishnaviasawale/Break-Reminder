@@ -336,6 +336,43 @@ def test_get_image_uses_fallback_when_online_image_fails(
     assert title == "Time for a break!"
 
 
+def test_get_image_uses_fallback_when_duckduckgo_fails(monkeypatch):
+    class FakeImage:
+        def thumbnail(self, size):
+            pass
+
+    def fake_duckduckgo_image(topic):
+        raise main.DDGSException("Ratelimit")
+
+    monkeypatch.setattr(
+        main,
+        "get_duckduckgo_image",
+        fake_duckduckgo_image,
+    )
+
+    monkeypatch.setattr(
+        main.random,
+        "choice",
+        lambda sources: "puppies",
+    )
+
+    monkeypatch.setattr(
+        main,
+        "get_fallback_image",
+        lambda: (FakeImage(), "Time for a break!"),
+    )
+
+    monkeypatch.setattr(
+        main.ImageTk,
+        "PhotoImage",
+        lambda image: object(),
+    )
+
+    _, title = main.get_image()
+
+    assert title == "Time for a break!"
+
+
 def test_get_image_returns_text_only_when_no_fallback_exists(
     monkeypatch,
 ):

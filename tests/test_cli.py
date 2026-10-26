@@ -349,12 +349,14 @@ def test_launch_gui_starts_detached_gui_when_none_running(
     assert kwargs["start_new_session"] is True
 
 
-def test_show_existing_app_removes_stale_socket(isolated_paths):
+def test_show_existing_app_leaves_unreachable_socket(isolated_paths):
+    # The CLI must not delete the socket: the GUI may have bound it but not
+    # yet called listen(). The GUI cleans up stale sockets on startup.
     cli.ensure_runtime_dir()
-    cli.SOCKET_FILE.write_text("")  # left behind, nobody listening
+    cli.SOCKET_FILE.write_text("")  # nobody listening
 
     assert cli.show_existing_app() is False
-    assert cli.SOCKET_FILE.exists() is False
+    assert cli.SOCKET_FILE.exists() is True
 
 
 def test_show_existing_app_sends_show(isolated_paths):

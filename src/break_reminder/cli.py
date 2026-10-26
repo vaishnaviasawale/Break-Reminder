@@ -36,12 +36,11 @@ def send_command(command):
             sock.connect(str(SOCKET_FILE))
             sock.sendall(command.encode())
         return True
-    except (FileNotFoundError, ConnectionRefusedError):
-        SOCKET_FILE.unlink(missing_ok=True)
-        return False
     except OSError:
-        # Any other socket problem: treat the GUI as unreachable rather than
-        # crashing after the config has already been saved.
+        # Treat the GUI as unreachable rather than crashing after the config
+        # has already been saved. Don't delete the socket file here: a refused
+        # connection can also mean the GUI has bound but not yet called
+        # listen(). The GUI clears stale sockets itself on startup.
         return False
 
 

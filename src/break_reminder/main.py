@@ -11,7 +11,7 @@ from ddgs import DDGS
 from ddgs.exceptions import DDGSException
 from PIL import Image, ImageTk
 
-from break_reminder import config
+from break_reminder import autostart, config
 
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
@@ -194,6 +194,21 @@ def toggle_enabled():
     apply_config()
 
 
+def toggle_autostart():
+    try:
+        if autostart_var.get():
+            autostart.enable()
+        else:
+            autostart.disable()
+    except OSError as error:
+        # FileNotFoundError (no break-reminder executable on PATH) is an
+        # OSError too, as are permission problems in ~/.config/autostart
+        error_label.config(text=f"Could not change Start at login: {error}")
+
+    # If enabling failed, this unticks the box again
+    autostart_var.set(autostart.is_enabled())
+
+
 def apply_config():
     # Called when the reminder is switched on or off, either from the button
     # or from "break-reminder enable/disable" in the terminal. Disabling stops
@@ -364,6 +379,10 @@ def show_window():
     root.lift()
     root.focus_force()
 
+    # Autostart may have been changed with "break-reminder autostart" while
+    # the window was hidden
+    autostart_var.set(autostart.is_enabled())
+
     if timer_end_time is not None:
         update_timer_display()
 
@@ -459,6 +478,7 @@ def main():
     global start_button
     global disabled_hint_label
     global control_status_button
+    global autostart_var
     global timer_status_label
     global error_label
     # These variables existed at a module level - when moved inside main,
@@ -522,6 +542,19 @@ def main():
     )
 
     control_status_button.pack(pady=10)
+
+    autostart_var = tk.BooleanVar(value=autostart.is_enabled())
+    # Tkinter widgets can't hold a Python bool directly; the Checkbutton
+    # reads and writes its ticked state through this variable
+
+    autostart_checkbox = tk.Checkbutton(
+        root,
+        text="Start at login",
+        variable=autostart_var,
+        command=toggle_autostart,
+    )
+
+    autostart_checkbox.pack(pady=5)
 
     update_control_button()
 

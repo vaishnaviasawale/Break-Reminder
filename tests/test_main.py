@@ -37,6 +37,18 @@ class FakeWidget:
         self.options.update(kwargs)
 
 
+class FakeVar:
+    # Stands in for tk.BooleanVar, which needs a real Tk window
+    def __init__(self, value=False):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
+
+
 def test_start_timer_does_nothing_when_reminder_disabled(
     monkeypatch,
 ):
@@ -942,10 +954,35 @@ def test_show_window_restores_and_focuses_window(monkeypatch):
             calls.append("focus_force")
 
     monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main.autostart, "is_enabled", lambda: False)
+    monkeypatch.setattr(main, "autostart_var", FakeVar(), raising=False)
 
     main.show_window()
 
     assert calls == ["deiconify", "lift", "focus_force"]
+
+
+def test_show_window_refreshes_start_at_login(monkeypatch):
+    # "break-reminder autostart enable" ran while the window was hidden
+    class FakeRoot:
+        def deiconify(self):
+            pass
+
+        def lift(self):
+            pass
+
+        def focus_force(self):
+            pass
+
+    autostart_var = FakeVar(False)
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main.autostart, "is_enabled", lambda: True)
+    monkeypatch.setattr(main, "autostart_var", autostart_var, raising=False)
+
+    main.show_window()
+
+    assert autostart_var.get() is True
 
 
 def test_instance_lock_allows_only_one_owner(
@@ -1079,3 +1116,60 @@ def test_start_button_active_without_hint_when_enabled(monkeypatch):
 
     assert start_button.options["state"] == main.tk.NORMAL
     assert hint_label.options["text"] == ""
+
+
+@pytest.fixture
+def autostart_paths(tmp_path, monkeypatch):
+    desktop_file = tmp_path / "autostart" / "break-reminder.desktop"
+
+    monkeypatch.setattr(main.autostart, "AUTOSTART_DIR", tmp_path / "autostart")
+    monkeypatch.setattr(main.autostart, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(
+        main.autostart.shutil,
+        "which",
+        lambda name: f"/usr/local/bin/{name}",
+    )
+
+    return desktop_file
+
+
+def test_ticking_start_at_login_enables_autostart(monkeypatch, autostart_paths):
+    monkeypatch.setattr(main, "autostart_var", FakeVar(True), raising=False)
+    monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
+
+    main.toggle_autostart()
+
+    assert autostart_paths.exists() is True
+    assert main.autostart_var.get() is True
+
+
+def test_unticking_start_at_login_disables_autostart(
+    monkeypatch,
+    autostart_paths,
+):
+    main.autostart.enable()
+
+    monkeypatch.setattr(main, "autostart_var", FakeVar(False), raising=False)
+    monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
+
+    main.toggle_autostart()
+
+    assert autostart_paths.exists() is False
+    assert main.autostart_var.get() is False
+
+
+def test_start_at_login_unticks_and_explains_when_enable_fails(
+    monkeypatch,
+    autostart_paths,
+):
+    monkeypatch.setattr(main.autostart.shutil, "which", lambda name: None)
+
+    error_label = FakeLabel()
+    monkeypatch.setattr(main, "autostart_var", FakeVar(True), raising=False)
+    monkeypatch.setattr(main, "error_label", error_label, raising=False)
+
+    main.toggle_autostart()
+
+    assert autostart_paths.exists() is False
+    assert main.autostart_var.get() is False
+    assert "Could not find the break-reminder executable" in error_label.text

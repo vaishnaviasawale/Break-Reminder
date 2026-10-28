@@ -5,10 +5,10 @@ from break_reminder import cli
 
 @pytest.fixture(autouse=True)
 def fake_executable(monkeypatch):
-    # enable_autostart() looks up the installed command on PATH; don't depend
+    # autostart.enable() looks up the installed command on PATH; don't depend
     # on how the test environment was installed.
     monkeypatch.setattr(
-        cli.shutil,
+        cli.autostart.shutil,
         "which",
         lambda name: f"/usr/local/bin/{name}",
     )
@@ -21,8 +21,8 @@ def isolated_paths(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     runtime_dir = tmp_path / "runtime"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(cli.config, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(cli.config, "CONFIG_FILE", config_dir / "config.json")
     monkeypatch.setattr(cli, "RUNTIME_DIR", runtime_dir)
@@ -40,8 +40,8 @@ def test_autostart_is_disabled_by_default(tmp_path, monkeypatch):
     autostart_dir = tmp_path / "autostart"
     desktop_file = autostart_dir / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
 
     assert desktop_file.exists() is False
 
@@ -50,8 +50,8 @@ def test_enable_autostart_creates_desktop_file(tmp_path, monkeypatch):
     autostart_dir = tmp_path / "autostart"
     desktop_file = autostart_dir / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
 
     cli.enable_autostart()
 
@@ -62,13 +62,13 @@ def test_disable_autostart_removes_desktop_file(tmp_path, monkeypatch):
     autostart_dir = tmp_path / "autostart"
     desktop_file = autostart_dir / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
 
     cli.enable_autostart()
     assert desktop_file.exists() is True
 
-    cli.disable_autostart()
+    cli.autostart.disable()
 
     assert desktop_file.exists() is False
 
@@ -77,13 +77,13 @@ def test_enable_then_disable_autostart(tmp_path, monkeypatch):
     autostart_dir = tmp_path / "autostart"
     desktop_file = autostart_dir / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
 
     cli.enable_autostart()
     assert desktop_file.exists() is True
 
-    cli.disable_autostart()
+    cli.autostart.disable()
     assert desktop_file.exists() is False
 
 
@@ -93,8 +93,8 @@ def test_autostart_enable_does_not_enable_reminder(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_file = config_dir / "config.json"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(cli.config, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(cli.config, "CONFIG_FILE", config_file)
 
@@ -113,15 +113,15 @@ def test_autostart_disable_does_not_change_reminder(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_file = config_dir / "config.json"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(cli.config, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(cli.config, "CONFIG_FILE", config_file)
 
     cli.config.enable()
     cli.enable_autostart()
 
-    cli.disable_autostart()
+    cli.autostart.disable()
 
     assert desktop_file.exists() is False
     assert cli.config.is_enabled() is True
@@ -136,8 +136,8 @@ def test_reminder_disable_does_not_disable_autostart(
     config_dir = tmp_path / "config"
     config_file = config_dir / "config.json"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(cli.config, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(cli.config, "CONFIG_FILE", config_file)
 
@@ -157,8 +157,8 @@ def test_reminder_enable_does_not_change_autostart(
     config_dir = tmp_path / "config"
     config_file = config_dir / "config.json"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", autostart_dir)
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(cli.config, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(cli.config, "CONFIG_FILE", config_file)
 
@@ -174,8 +174,8 @@ def test_reminder_enable_does_not_change_autostart(
 def test_desktop_file_launches_installed_command(tmp_path, monkeypatch):
     desktop_file = tmp_path / "autostart" / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", tmp_path / "autostart")
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", tmp_path / "autostart")
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
 
     cli.enable_autostart()
 
@@ -185,9 +185,9 @@ def test_desktop_file_launches_installed_command(tmp_path, monkeypatch):
 def test_enable_autostart_fails_without_executable(tmp_path, monkeypatch):
     desktop_file = tmp_path / "autostart" / "break-reminder.desktop"
 
-    monkeypatch.setattr(cli, "AUTOSTART_DIR", tmp_path / "autostart")
-    monkeypatch.setattr(cli, "DESKTOP_FILE", desktop_file)
-    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli.autostart, "AUTOSTART_DIR", tmp_path / "autostart")
+    monkeypatch.setattr(cli.autostart, "DESKTOP_FILE", desktop_file)
+    monkeypatch.setattr(cli.autostart.shutil, "which", lambda name: None)
 
     with pytest.raises(SystemExit) as error:
         cli.enable_autostart()

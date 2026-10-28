@@ -1,22 +1,11 @@
-import shutil
 import socket
 import subprocess
 import sys  # System module to interact with the Python runtime environment
 # (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
-from break_reminder import config
+from break_reminder import autostart, config
 
-
-# Users home directory is Path.home()
-AUTOSTART_DIR = Path.home() / ".config" / "autostart"
-
-DESKTOP_FILE = AUTOSTART_DIR / "break-reminder.desktop"
-# .desktop files are plain text configuration files that act as application
-# shortcuts and metadata. They dictate how a program appears in your
-# application menu, which icon it uses, and how it launches.
-# GNOME checks ~/.config/autostart/ every time there is a log in. Every
-# .desktop file inside gets launched.
 
 RUNTIME_DIR = Path.home() / ".config" / "break-reminder"
 SOCKET_FILE = RUNTIME_DIR / "break-reminder.sock"
@@ -78,67 +67,12 @@ def launch_gui():
     # start_new_session=True
 
 
-def ensure_autostart_dir():
-    AUTOSTART_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-    # Creates ~/.config/autostart if it doesnt exist
-
-
 def enable_autostart():
-    # Register my application with GNOME so the application launches
-    # automatically.
-    # Creates a .desktop file in ~/.config/autostart that launches main.py
-    # when the user logs in
-    ensure_autostart_dir()
-
-    executable = shutil.which("break-reminder")
-    # searches your PATH for an executable.
-    # /home/you/.local/bin/break-reminder
-    # The .desktop file needs to know what executable GNOME should launch:
-    # Exec=/home/you/.local/bin/break-reminder
-
-    if executable is None:
-        print("Could not find the break-reminder executable.")
+    try:
+        autostart.enable()
+    except FileNotFoundError as error:
+        print(error)
         raise SystemExit(1)
-
-    desktop_contents = f"""\
-[Desktop Entry]
-Type=Application
-Name=Break Reminder
-Exec={executable}
-Terminal=false
-X-GNOME-Autostart-enabled=true
-"""
-
-    DESKTOP_FILE.write_text(desktop_contents)
-
-    print("Break Reminder autostart enabled.")
-
-
-# Instead of creating: Exec=/home/.../Projects/break-reminder/.venv/bin/python
-# /home/.../Projects/break-reminder/main.py
-# It will create: Exec=/home/vaishnavi-asawale/.local/bin/break-reminder
-
-
-def disable_autostart():
-    if DESKTOP_FILE.exists():
-        DESKTOP_FILE.unlink()
-        # This is like deleting the file. It removes the .desktop file from
-        # ~/.config/autostart, which means the program will no longer launch
-        # automatically when the user logs in.
-        print("Break Reminder autostart disabled.")
-    else:
-        print("Break reminder utostart is already disabled.")
-
-
-def status_autostart():
-
-    if DESKTOP_FILE.exists():
-        print("Break reminder autostart is enabled")
-    else:
-        print("Break reminder autostart is disabled")
 
 
 def main():
@@ -219,9 +153,9 @@ def main():
         if subcommand == "enable":
             enable_autostart()
         elif subcommand == "disable":
-            disable_autostart()
+            autostart.disable()
         elif subcommand == "status":
-            status_autostart()
+            autostart.status()
         else:
             print(f"Unknown autostart command: {subcommand}")
             raise SystemExit(1)

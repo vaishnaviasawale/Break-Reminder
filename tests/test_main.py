@@ -29,6 +29,14 @@ class FakeLabel:
         self.text = kwargs.get("text")
 
 
+class FakeWidget:
+    def __init__(self):
+        self.options = {}
+
+    def config(self, **kwargs):
+        self.options.update(kwargs)
+
+
 def test_start_timer_does_nothing_when_reminder_disabled(
     monkeypatch,
 ):
@@ -726,6 +734,10 @@ def test_toggle_enabled_flips_reminder_and_button(
         FakeLabel(),
         raising=False,
     )
+    monkeypatch.setattr(main, "start_button", FakeWidget(), raising=False)
+    monkeypatch.setattr(
+        main, "disabled_hint_label", FakeWidget(), raising=False
+    )
 
     main.toggle_enabled()
 
@@ -819,6 +831,11 @@ def scheduler(monkeypatch):
         raising=False,
     )
 
+    monkeypatch.setattr(main, "start_button", FakeWidget(), raising=False)
+    monkeypatch.setattr(
+        main, "disabled_hint_label", FakeWidget(), raising=False
+    )
+
     scheduler = FakeScheduler()
     monkeypatch.setattr(main, "root", scheduler, raising=False)
 
@@ -888,6 +905,7 @@ def test_disabling_cancels_running_timer(monkeypatch, scheduler):
     assert main.timer_end_time is None
     assert main.timer_status_label.text == ""
     assert button.text == "Enable Reminder"
+    assert main.start_button.options["state"] == main.tk.DISABLED
 
 
 def test_enabling_keeps_running_timer(monkeypatch, scheduler):
@@ -1027,3 +1045,37 @@ def test_command_reaches_running_gui(monkeypatch, tmp_path, command, handler):
 
     assert received.wait(timeout=2)
     assert calls == [(0, getattr(main, handler))]
+
+
+def test_start_button_greyed_out_with_hint_when_disabled(monkeypatch):
+    start_button = FakeWidget()
+    hint_label = FakeWidget()
+
+    monkeypatch.setattr(main.config, "is_enabled", lambda: False)
+    monkeypatch.setattr(main, "start_button", start_button, raising=False)
+    monkeypatch.setattr(main, "disabled_hint_label", hint_label, raising=False)
+    monkeypatch.setattr(
+        main, "control_status_button", FakeWidget(), raising=False
+    )
+
+    main.update_control_button()
+
+    assert start_button.options["state"] == main.tk.DISABLED
+    assert "Enable" in hint_label.options["text"]
+
+
+def test_start_button_active_without_hint_when_enabled(monkeypatch):
+    start_button = FakeWidget()
+    hint_label = FakeWidget()
+
+    monkeypatch.setattr(main.config, "is_enabled", lambda: True)
+    monkeypatch.setattr(main, "start_button", start_button, raising=False)
+    monkeypatch.setattr(main, "disabled_hint_label", hint_label, raising=False)
+    monkeypatch.setattr(
+        main, "control_status_button", FakeWidget(), raising=False
+    )
+
+    main.update_control_button()
+
+    assert start_button.options["state"] == main.tk.NORMAL
+    assert hint_label.options["text"] == ""

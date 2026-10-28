@@ -171,10 +171,18 @@ def update_content():
 
 
 def update_control_button():
+    # Also greys out Start Timer while the reminder is off, so clicking it
+    # can't silently do nothing
     if config.is_enabled():
         control_status_button.config(text="Disable Reminder")
+        start_button.config(state=tk.NORMAL)
+        disabled_hint_label.config(text="")
     else:
         control_status_button.config(text="Enable Reminder")
+        start_button.config(state=tk.DISABLED)
+        disabled_hint_label.config(
+            text="Reminder is off. Enable it to start a timer."
+        )
 
 
 def toggle_enabled():
@@ -449,6 +457,7 @@ def main():
     global image_label
     global time_entry
     global start_button
+    global disabled_hint_label
     global control_status_button
     global timer_status_label
     global error_label
@@ -498,6 +507,14 @@ def main():
     # This is unline the way we use get_quote or get_image since we need to
     # execute those function immediately and use their values
     start_button.pack(pady=20)
+
+    disabled_hint_label = tk.Label(
+        root,
+        text="",
+        font=("Sans", 12),
+    )
+
+    disabled_hint_label.pack()
 
     control_status_button = tk.Button(
         root,

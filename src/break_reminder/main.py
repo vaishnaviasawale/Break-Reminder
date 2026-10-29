@@ -17,6 +17,8 @@ from break_reminder import autostart, config
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
 
+MAX_MINUTES = 24 * 60
+
 PROJECT_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = PROJECT_DIR / "assets"
 
@@ -280,6 +282,12 @@ def start_timer():
     if minutes <= 0:
         error_label.config(
             text="Please enter a number greater than 0."
+        )
+        return
+
+    if minutes > MAX_MINUTES:
+        error_label.config(
+            text=f"Please enter {MAX_MINUTES} minutes or fewer."
         )
         return
 

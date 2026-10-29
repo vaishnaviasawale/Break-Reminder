@@ -499,6 +499,8 @@ def test_update_content_handles_missing_image(monkeypatch):
         ("1.5", "Please enter a whole number of minutes."),
         ("0", "Please enter a number greater than 0."),
         ("-5", "Please enter a number greater than 0."),
+        ("1441", "Please enter 1440 minutes or fewer."),
+        ("9" * 20, "Please enter 1440 minutes or fewer."),
     ],
 )
 def test_start_timer_shows_error_for_invalid_input(

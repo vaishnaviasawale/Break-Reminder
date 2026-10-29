@@ -3,6 +3,7 @@ import random
 import tkinter as tk
 from io import BytesIO
 from pathlib import Path
+import queue
 import socket
 import threading
 from datetime import datetime, timedelta
@@ -366,6 +367,10 @@ def cancel_refresh_loop():
         refresh_id = None
 
 
+command_queue = queue.Queue()
+COMMAND_POLL_MS = 100
+
+
 def start_command_server():
     thread = threading.Thread(
         target=handle_commands,
@@ -440,12 +445,26 @@ def handle_commands():
         with connection:
             command = connection.recv(1024).decode()
 
+        # Don't touch Tkinter from this thread; hand the command to the
+        # main thread, which picks it up in poll_commands().
+        command_queue.put(command)
+
+
+def poll_commands():
+    while True:
+        try:
+            command = command_queue.get_nowait()
+        except queue.Empty:
+            break
+
         if command == "show":
-            root.after(0, show_window)
+            show_window()
         elif command == "config-changed":
-            root.after(0, apply_config)
+            apply_config()
         elif command == "quit":
-            root.after(0, quit_app)
+            quit_app()
+
+    root.after(COMMAND_POLL_MS, poll_commands)
 
 
 def show_existing_app():
@@ -559,6 +578,7 @@ def main():
     update_control_button()
 
     start_command_server()
+    poll_commands()
     refresh_timer_display()
 
     root.mainloop()

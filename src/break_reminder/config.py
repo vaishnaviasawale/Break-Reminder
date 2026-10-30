@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -59,6 +61,12 @@ def load_config():
         log_warning(f"{CONFIG_FILE} is not a JSON object, using defaults")
         return dict(DEFAULT_CONFIG)
 
+    missing = sorted(DEFAULT_CONFIG.keys() - loaded.keys())
+    if missing:
+        log_warning(
+            f"{CONFIG_FILE} is missing {', '.join(missing)}, using defaults"
+        )
+
     # Defaults fill in any missing keys
     return {**DEFAULT_CONFIG, **loaded}
 
@@ -66,12 +74,17 @@ def load_config():
 def save_config(config):
     ensure_config_exists()
 
-    CONFIG_FILE.write_text(
-        json.dumps(
-            config,
-            indent=4,
-        )
-    )
+    # Write to a temp file in the same directory, then swap it into place.
+    # os.replace is atomic, so a crash mid-write can never leave a
+    # truncated config.json behind.
+    fd, tmp_path = tempfile.mkstemp(dir=CONFIG_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as tmp_file:
+            json.dump(config, tmp_file, indent=4)
+        os.replace(tmp_path, CONFIG_FILE)
+    except BaseException:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
 
 def is_enabled():

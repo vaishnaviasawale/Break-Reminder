@@ -176,3 +176,64 @@ def test_valid_config_is_not_logged(tmp_path, monkeypatch):
     config.load_config()
 
     assert not (config_dir / config.LOG_NAME).exists()
+
+
+def test_missing_key_is_logged(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config_dir.mkdir()
+    config_file.write_text("{}")
+
+    config.load_config()
+
+    log = (config_dir / config.LOG_NAME).read_text()
+    assert "missing enabled" in log
+
+
+def test_failed_save_keeps_old_config_and_cleans_up(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config.disable()
+
+    def fail(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(config.os, "replace", fail)
+
+    try:
+        config.enable()
+    except OSError:
+        pass
+
+    monkeypatch.undo()
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    assert config.is_enabled() is False
+    assert list(config_dir.glob("*.tmp")) == []
+
+
+def test_unserializable_config_does_not_clobber_file(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config.disable()
+
+    try:
+        config.save_config({"enabled": object()})
+    except TypeError:
+        pass
+
+    assert config.is_enabled() is False
+    assert list(config_dir.glob("*.tmp")) == []

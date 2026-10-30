@@ -147,3 +147,32 @@ def test_disable_repairs_corrupt_config(tmp_path, monkeypatch):
     config.disable()
 
     assert config.is_enabled() is False
+
+
+def test_corrupt_config_is_logged(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config_dir.mkdir()
+    config_file.write_text("{not valid json")
+
+    config.load_config()
+
+    log = (config_dir / config.LOG_NAME).read_text()
+    assert "WARNING" in log
+    assert "using defaults" in log
+
+
+def test_valid_config_is_not_logged(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config.load_config()
+
+    assert not (config_dir / config.LOG_NAME).exists()

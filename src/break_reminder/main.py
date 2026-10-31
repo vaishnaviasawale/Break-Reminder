@@ -548,6 +548,9 @@ def main():
 
     time_entry = tk.Entry(root)
     time_entry.pack()
+    # bind passes an event argument, which start_timer doesn't accept
+    time_entry.bind("<Return>", lambda event: start_timer())
+    time_entry.bind("<KP_Enter>", lambda event: start_timer())
 
     start_button = tk.Button(root, text="Start Timer", command=start_timer)
     # We skip the parenthesis when calling start_timer as we don't want to

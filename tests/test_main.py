@@ -733,6 +733,7 @@ def test_toggle_enabled_flips_reminder_and_button(
         "CONFIG_FILE",
         tmp_path / "config.json",
     )
+    monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
 
     button = FakeLabel()
 
@@ -779,6 +780,7 @@ def test_quit_app_cancels_timer_and_destroys_window(monkeypatch):
             destroyed = True
 
     monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
     monkeypatch.setattr(
         main,
         "timer_status_label",
@@ -1175,3 +1177,22 @@ def test_start_at_login_unticks_and_explains_when_enable_fails(
     assert autostart_paths.exists() is False
     assert main.autostart_var.get() is False
     assert "Could not find the break-reminder executable" in error_label.text
+
+
+def test_cancel_timer_clears_error_label(monkeypatch):
+    error_label = FakeLabel()
+    error_label.text = "Please enter the number of minutes."
+
+    monkeypatch.setattr(main, "root", object(), raising=False)
+    monkeypatch.setattr(main, "error_label", error_label, raising=False)
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        FakeLabel(),
+        raising=False,
+    )
+
+    main.timer_id = None
+    main.cancel_timer()
+
+    assert error_label.text == ""

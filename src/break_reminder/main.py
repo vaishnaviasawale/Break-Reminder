@@ -233,6 +233,7 @@ def cancel_timer():
     cancel_refresh_loop()
 
     timer_end_time = None
+    error_label.config(text="")
     update_timer_display()
 
 

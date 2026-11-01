@@ -201,7 +201,7 @@ def test_timer_finished_does_not_show_break_if_disabled(
     assert main.timer_end_time is None
 
 
-def test_timer_finished_shows_break_if_enabled(
+def test_timer_finished_starts_image_fetch_if_enabled(
     monkeypatch,
 ):
     monkeypatch.setattr(
@@ -242,7 +242,7 @@ def test_timer_finished_shows_break_if_enabled(
     main.timer_finished()
 
     assert content_updated is True
-    assert window_restored is True
+    assert window_restored is False  # shown later, by show_image()
     assert main.timer_id is None
     assert main.timer_end_time is None
 
@@ -441,7 +441,7 @@ def test_fallback_images_are_packaged():
     assert title == "Time for a break!"
 
 
-def test_update_content_handles_missing_image(monkeypatch):
+def test_show_image_handles_missing_image(monkeypatch):
     class FakeInstructionLabel:
         def __init__(self):
             self.config_calls = []
@@ -474,12 +474,14 @@ def test_update_content_handles_missing_image(monkeypatch):
         raising=False,
     )
 
-    def fake_get_image():
-        return None, "Time for a break!"
+    class FakeRoot:
+        def deiconify(self):
+            pass
 
-    monkeypatch.setattr(main, "get_image", fake_get_image)
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main.config, "is_enabled", lambda: True)
 
-    main.update_content()
+    main.show_image(None, "Time for a break!")
 
     assert instruction_label.config_calls
     assert instruction_label.config_calls[0]["text"] == "Time for a break!"
@@ -1196,3 +1198,107 @@ def test_cancel_timer_clears_error_label(monkeypatch):
     main.cancel_timer()
 
     assert error_label.text == ""
+
+
+def test_update_content_fetches_in_background_with_deadline(monkeypatch):
+    started = []
+
+    class FakeThread:
+        def __init__(self, target, args, daemon):
+            started.append((target, args, daemon))
+
+        def start(self):
+            pass
+
+    scheduled = []
+
+    class FakeRoot:
+        def after(self, delay, callback):
+            scheduled.append(delay)
+
+    monkeypatch.setattr(main.threading, "Thread", FakeThread)
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main, "image_request_id", 0)
+
+    main.update_content()
+
+    assert started == [(main.fetch_image_in_background, (1,), True)]
+    assert scheduled == [main.IMAGE_DEADLINE_MS]
+
+
+def test_image_deadline_shows_fallback_if_nothing_arrived(monkeypatch):
+    shown = []
+    monkeypatch.setattr(main, "image_request_id", 3)
+    monkeypatch.setattr(main, "get_fallback_image", lambda: ("img", "Time for a break!"))
+    monkeypatch.setattr(main, "show_image", lambda image, title: shown.append((image, title)))
+
+    main.image_deadline(2)  # stale: that break already finished
+    assert shown == []
+
+    main.image_deadline(3)
+    assert shown == [("img", "Time for a break!")]
+
+
+def test_show_image_invalidates_pending_and_shows_window(monkeypatch):
+    class FakeLabel:
+        def config(self, **options):
+            pass
+
+    class FakeRoot:
+        shown = False
+
+        def deiconify(self):
+            self.shown = True
+
+    fake_root = FakeRoot()
+    monkeypatch.setattr(main, "instruction_label", FakeLabel(), raising=False)
+    monkeypatch.setattr(main, "image_label", FakeLabel(), raising=False)
+    monkeypatch.setattr(main, "root", fake_root, raising=False)
+    monkeypatch.setattr(main.config, "is_enabled", lambda: True)
+    monkeypatch.setattr(main, "image_request_id", 5)
+
+    main.show_image(None, "Time for a break!")
+
+    assert fake_root.shown is True
+    assert main.image_request_id == 6
+
+
+def test_show_image_stays_hidden_if_disabled(monkeypatch):
+    class FakeLabel:
+        def config(self, **options):
+            pass
+
+    class FakeRoot:
+        shown = False
+
+        def deiconify(self):
+            self.shown = True
+
+    fake_root = FakeRoot()
+    monkeypatch.setattr(main, "instruction_label", FakeLabel(), raising=False)
+    monkeypatch.setattr(main, "image_label", FakeLabel(), raising=False)
+    monkeypatch.setattr(main, "root", fake_root, raising=False)
+    monkeypatch.setattr(main.config, "is_enabled", lambda: False)
+
+    main.show_image(None, "Time for a break!")
+
+    assert fake_root.shown is False
+
+
+def test_poll_images_ignores_stale_results(monkeypatch):
+    shown = []
+    monkeypatch.setattr(main, "show_image", lambda image, title: shown.append(title))
+
+    class FakeRoot:
+        def after(self, ms, callback):
+            pass
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main, "image_request_id", 2)
+
+    main.image_queue.put((1, None, "old"))
+    main.image_queue.put((2, None, "new"))
+
+    main.poll_images()
+
+    assert shown == ["new"]

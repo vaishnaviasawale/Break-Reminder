@@ -174,7 +174,10 @@ def get_fallback_image():
     return Image.open(fallback_image), "Time for a break!"
 
 
-def get_image():
+def fetch_image():
+    # Does all the slow work (network, decoding) and returns a PIL image, not a
+    # PhotoImage: Tkinter objects must only be created on the main thread, so
+    # this is safe to run in a worker thread.
     try:
         sources = ["xkcd"] + TOPICS
         source = random.choice(sources)
@@ -184,7 +187,7 @@ def get_image():
         else:
             image, title = get_duckduckgo_image(source)
 
-        return to_photo(image), title
+        return image, title
 
     except Exception:
         # Network errors, bad JSON (KeyError), undecodable or rejected images
@@ -195,12 +198,20 @@ def get_image():
         fallback = get_fallback_image()
 
         if fallback is not None:
-            image, title = fallback
-            return to_photo(image), title
+            return fallback
     except Exception:
         pass
 
     return None, "Time for a break!"
+
+
+def get_image():
+    image, title = fetch_image()
+
+    if image is None:
+        return None, title
+
+    return to_photo(image), title
 
 
 def to_photo(image):
@@ -210,7 +221,77 @@ def to_photo(image):
 
 
 def update_content():
-    photo, title = get_image()
+    global image_request_id
+
+    # The popup stays hidden while the image is fetched in a worker thread. It
+    # is shown by show_image() once the image arrives, or with a local
+    # fallback image if nothing has arrived by IMAGE_DEADLINE_MS.
+    image_request_id += 1
+    request_id = image_request_id
+
+    thread = threading.Thread(
+        target=fetch_image_in_background,
+        args=(request_id,),
+        daemon=True,
+    )
+    thread.start()
+
+    root.after(IMAGE_DEADLINE_MS, lambda: image_deadline(request_id))
+
+
+def invalidate_pending_image():
+    # Makes any fetch still in flight, and its deadline, do nothing
+    global image_request_id
+
+    image_request_id += 1
+
+
+def image_deadline(request_id):
+    if request_id != image_request_id:
+        return  # The image already arrived, or the break was cancelled
+
+    try:
+        fallback = get_fallback_image()
+    except Exception:
+        fallback = None
+
+    if fallback is None:
+        show_image(None, "Time for a break!")
+    else:
+        show_image(*fallback)
+
+
+def fetch_image_in_background(request_id):
+    try:
+        image, title = fetch_image()
+    except Exception:
+        image, title = None, "Time for a break!"
+
+    # Don't touch Tkinter from this thread; poll_images() picks this up
+    image_queue.put((request_id, image, title))
+
+
+def poll_images():
+    while True:
+        try:
+            request_id, image, title = image_queue.get_nowait()
+        except queue.Empty:
+            break
+
+        # A newer break may have started while this one was downloading
+        if request_id == image_request_id:
+            show_image(image, title)
+
+    root.after(IMAGE_POLL_MS, poll_images)
+
+
+def show_image(image, title):
+    invalidate_pending_image()
+
+    try:
+        photo = to_photo(image) if image is not None else None
+    except Exception:
+        photo = None
 
     instruction_label.config(
         text=title,
@@ -220,15 +301,21 @@ def update_content():
     if photo is None:
         image_label.config(image="")
         image_label.image = None
-        return
+    else:
+        set_photo(photo)
 
+    if config.is_enabled():
+        root.deiconify()
+
+
+def set_photo(photo):
     image_label.config(image=photo)
 
     image_label.image = photo
     # We are attaching a new attribute called image to the image_label object.
     # In Python, most objects can have attributes added dynamically. By
     # storing the PhotoImage there, we keep a reference to it alive. If we
-    # didn't, the local variable photo would disappear when update_content()
+    # didn't, the local variable photo would disappear when show_image()
     # returns, and Python's garbage collector could free the image, causing it
     # to vanish from the window.
 
@@ -295,6 +382,7 @@ def cancel_timer():
         root.after_cancel(timer_id)
         timer_id = None
 
+    invalidate_pending_image()
     cancel_refresh_loop()
 
     timer_end_time = None
@@ -322,8 +410,7 @@ def timer_finished():
         )
         image_label.config(image="")
         image_label.image = None
-
-    root.deiconify()
+        root.deiconify()
 
 
 def start_timer():
@@ -368,6 +455,8 @@ def start_timer():
         return
 
     error_label.config(text="")
+
+    invalidate_pending_image()
 
     if timer_id is not None:
         root.after_cancel(timer_id)
@@ -453,6 +542,11 @@ def cancel_refresh_loop():
 
 command_queue = queue.Queue()
 COMMAND_POLL_MS = 100
+
+image_queue = queue.Queue()
+IMAGE_POLL_MS = 100
+IMAGE_DEADLINE_MS = 3000
+image_request_id = 0
 
 
 def start_command_server():
@@ -666,6 +760,7 @@ def main():
 
     start_command_server()
     poll_commands()
+    poll_images()
     refresh_timer_display()
 
     root.mainloop()

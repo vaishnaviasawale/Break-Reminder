@@ -30,6 +30,12 @@ FALLBACK_IMAGES = list(ASSETS_DIR.glob("fallback_*.png"))
 
 XKCD_API = "https://xkcd.com/info.0.json"
 
+# Images come from the internet, so we only accept common raster formats
+# (no SVG etc.) and refuse anything unreasonably large
+ALLOWED_IMAGE_FORMATS = ["PNG", "JPEG", "GIF", "WEBP"]
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_IMAGE_PIXELS = 25_000_000
+
 TOPICS = [
     "beautiful landscapes",
     "seaside views",
@@ -44,6 +50,35 @@ timer_end_time = None
 timer_status_label = None
 refresh_id = None  # The once-a-second countdown update also needs an id, so
 # the old countdown can be cancelled when a new timer is started
+
+
+def download_image(url):
+    # Download and decode an image from an untrusted URL. Raises if it is not
+    # something we are happy to display.
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Unsupported image URL: {url}")
+
+    with requests.get(url, timeout=5, stream=True) as response:
+        response.raise_for_status()
+
+        data = bytearray()
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            data.extend(chunk)
+            if len(data) > MAX_IMAGE_BYTES:
+                raise ValueError("Image is too large")
+
+    # formats= makes Pillow reject anything that is not on the allow-list,
+    # based on the file's contents rather than its name or Content-Type
+    image = Image.open(BytesIO(data), formats=ALLOWED_IMAGE_FORMATS)
+
+    if image.width * image.height > MAX_IMAGE_PIXELS:
+        raise ValueError("Image has too many pixels")
+
+    # Open is lazy. load() decodes everything now, so a truncated or corrupt
+    # file fails here, inside get_image's try, instead of later in Tkinter
+    image.load()
+
+    return image
 
 
 def get_xkcd_image():
@@ -66,18 +101,7 @@ def get_xkcd_image():
     image_url = comic_data["img"]
     title = comic_data["title"]
 
-    image_response = requests.get(
-        image_url,
-        timeout=5,
-    )
-    image_response.raise_for_status()
-
-    # image_response.content is Raw Bytes
-    # BytesIO pretends those bytes are in a file
-    # .open() reads the JPEG
-    image = Image.open(BytesIO(image_response.content))
-
-    return image, title
+    return download_image(image_url), title
 
 
 def get_duckduckgo_image(topic):
@@ -93,15 +117,7 @@ def get_duckduckgo_image(topic):
 
     image_url = results[0]["image"]
 
-    response = requests.get(
-        image_url,
-        timeout=5,
-    )
-    response.raise_for_status()
-
-    image = Image.open(BytesIO(response.content))
-
-    return image, topic
+    return download_image(image_url), topic
 
 
 def get_fallback_image():
@@ -124,24 +140,29 @@ def get_image():
         else:
             image, title = get_duckduckgo_image(source)
 
-    except (
-        requests.RequestException,
-        DDGSException,
-        RuntimeError,
-        OSError,
-    ):
+        return to_photo(image), title
+
+    except Exception:
+        # Network errors, bad JSON (KeyError), undecodable or rejected images
+        # and so on. Whatever went wrong, the break must still show up.
+        pass
+
+    try:
         fallback = get_fallback_image()
 
-        if fallback is None:
-            return None, "Time for a break!"
+        if fallback is not None:
+            image, title = fallback
+            return to_photo(image), title
+    except Exception:
+        pass
 
-        image, title = fallback
+    return None, "Time for a break!"
 
+
+def to_photo(image):
     image.thumbnail((450, 300))
 
-    photo = ImageTk.PhotoImage(image)
-
-    return photo, title
+    return ImageTk.PhotoImage(image)
 
 
 def update_content():
@@ -247,7 +268,17 @@ def timer_finished():
     if not config.is_enabled():
         return  # Stay hidden: the reminder was switched off
 
-    update_content()
+    try:
+        update_content()
+    except Exception:
+        # A broken image must never stop the break popup from appearing
+        instruction_label.config(
+            text="Time for a break!",
+            font=("Sans", 18, "bold"),
+        )
+        image_label.config(image="")
+        image_label.image = None
+
     root.deiconify()
 
 

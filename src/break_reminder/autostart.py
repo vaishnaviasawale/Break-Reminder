@@ -1,4 +1,6 @@
+import os
 import shutil
+import tempfile
 from pathlib import Path
 
 # Shared by the CLI ("break-reminder autostart ...") and the "Start at login"
@@ -23,6 +25,22 @@ def ensure_autostart_dir():
         exist_ok=True,
     )
     # Creates ~/.config/autostart if it doesnt exist
+
+
+def quote_exec(path):
+    # Exec= values are split on spaces, so a path containing any (or other
+    # reserved characters) needs double quotes. Inside quotes, " ` $ and \\
+    # must be backslash-escaped, and the .desktop string layer then requires
+    # each backslash doubled.
+    # A literal % is written %% so it isn't read as a field code.
+    if not any(char in path for char in ' \t\n"\'\\><~|&;$*?#()`%'):
+        return path
+
+    escaped = path.replace("\\", "\\\\\\\\")
+    for char in '"`$':
+        escaped = escaped.replace(char, "\\\\" + char)
+    escaped = escaped.replace("%", "%%")
+    return f'"{escaped}"'
 
 
 def is_enabled():
@@ -51,12 +69,22 @@ def enable():
 [Desktop Entry]
 Type=Application
 Name=Break Reminder
-Exec={executable}
+Exec={quote_exec(executable)}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 """
 
-    DESKTOP_FILE.write_text(desktop_contents)
+    # Write to a temp file in the same directory, then swap it into place,
+    # so a crash mid-write can't leave a truncated .desktop file behind.
+    fd, tmp_path = tempfile.mkstemp(dir=AUTOSTART_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as tmp_file:
+            tmp_file.write(desktop_contents)
+        os.chmod(tmp_path, 0o644)
+        os.replace(tmp_path, DESKTOP_FILE)
+    except BaseException:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
     print("Break Reminder autostart enabled.")
 

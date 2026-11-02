@@ -478,6 +478,12 @@ def test_show_image_handles_missing_image(monkeypatch):
         def deiconify(self):
             pass
 
+        def lift(self):
+            pass
+
+        def focus_force(self):
+            pass
+
     monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
     monkeypatch.setattr(main.config, "is_enabled", lambda: True)
 
@@ -1249,6 +1255,12 @@ def test_show_image_invalidates_pending_and_shows_window(monkeypatch):
 
         def deiconify(self):
             self.shown = True
+
+        def lift(self):
+            pass
+
+        def focus_force(self):
+            pass
 
     fake_root = FakeRoot()
     monkeypatch.setattr(main, "instruction_label", FakeLabel(), raising=False)

@@ -305,7 +305,7 @@ def show_image(image, title):
         set_photo(photo)
 
     if config.is_enabled():
-        root.deiconify()
+        raise_window()
 
 
 def set_photo(photo):
@@ -410,7 +410,7 @@ def timer_finished():
         )
         image_label.config(image="")
         image_label.image = None
-        root.deiconify()
+        raise_window()
 
 
 def start_timer():
@@ -557,10 +557,14 @@ def start_command_server():
     thread.start()
 
 
-def show_window():
+def raise_window():
     root.deiconify()
     root.lift()
     root.focus_force()
+
+
+def show_window():
+    raise_window()
 
     # Autostart may have been changed with "break-reminder autostart" while
     # the window was hidden

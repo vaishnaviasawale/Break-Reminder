@@ -194,6 +194,14 @@ def test_missing_key_is_logged(tmp_path, monkeypatch):
     assert "missing enabled" in log
 
 
+def test_log_level_can_be_set(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+
+    config.log_warning("boom", level="ERROR")
+
+    assert " ERROR boom" in (tmp_path / config.LOG_NAME).read_text()
+
+
 def test_failed_save_keeps_old_config_and_cleans_up(tmp_path, monkeypatch):
     config_dir = tmp_path / "break-reminder"
     config_file = config_dir / "config.json"

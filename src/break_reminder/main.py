@@ -606,20 +606,27 @@ def acquire_instance_lock():
 
 
 def handle_commands():
-    RUNTIME_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    try:
+        RUNTIME_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
-    SOCKET_FILE.unlink(missing_ok=True)
+        SOCKET_FILE.unlink(missing_ok=True)
 
-    server = socket.socket(
-        socket.AF_UNIX,
-        socket.SOCK_STREAM,
-    )
+        server = socket.socket(
+            socket.AF_UNIX,
+            socket.SOCK_STREAM,
+        )
 
-    server.bind(str(SOCKET_FILE))
-    server.listen(1)
+        server.bind(str(SOCKET_FILE))
+        server.listen(1)
+    except OSError as error:
+        config.log_warning(
+            f"Could not listen on {SOCKET_FILE}, CLI commands won't work: {error}",
+            level="ERROR",
+        )
+        return
 
     while True:
         connection, _ = server.accept()

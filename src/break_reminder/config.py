@@ -33,14 +33,14 @@ def ensure_config_exists():
         )
 
 
-def log_warning(message):
+def log_warning(message, level="WARNING"):
     # Both the CLI and the GUI go through load_config, so one log file
     # next to config.json covers both. Logging must never crash the app.
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with (CONFIG_DIR / LOG_NAME).open("a") as log:
             timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-            log.write(f"{timestamp} WARNING {message}\n")
+            log.write(f"{timestamp} {level} {message}\n")
     except OSError:
         pass
 

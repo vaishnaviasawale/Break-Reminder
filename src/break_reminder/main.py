@@ -690,7 +690,7 @@ def main():
     root = tk.Tk()
     root.title("Time for a break!")
     root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-    root.protocol("WM_DELETE_WINDOW", quit_app)
+    root.protocol("WM_DELETE_WINDOW", root.withdraw)
 
     instruction_label = tk.Label(
         root,

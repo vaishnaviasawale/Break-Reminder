@@ -645,6 +645,7 @@ def poll_commands():
             apply_config()
         elif command == "quit":
             quit_app()
+            return
 
     root.after(COMMAND_POLL_MS, poll_commands)
 

@@ -524,6 +524,16 @@ def refresh_timer_display():
         refresh_id = None
         return
 
+    # root.after() uses monotonic time, which pauses during suspend, while
+    # the deadline is wall-clock. Fire on the deadline here so a resume
+    # doesn't leave the label at 0:00 with no popup.
+    if datetime.now() >= timer_end_time:
+        refresh_id = None
+        if timer_id is not None:
+            root.after_cancel(timer_id)
+        timer_finished()
+        return
+
     update_timer_display()
 
     refresh_id = root.after(

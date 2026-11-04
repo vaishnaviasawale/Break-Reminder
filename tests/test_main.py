@@ -1314,3 +1314,32 @@ def test_poll_images_ignores_stale_results(monkeypatch):
     main.poll_images()
 
     assert shown == ["new"]
+
+
+def test_refresh_fires_break_when_deadline_passed_during_suspend(
+    monkeypatch,
+):
+    scheduler = FakeScheduler()
+    finished = []
+
+    monkeypatch.setattr(main, "root", scheduler, raising=False)
+    monkeypatch.setattr(
+        main,
+        "timer_status_label",
+        FakeLabel(),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        main,
+        "timer_finished",
+        lambda: finished.append(True),
+    )
+
+    main.timer_id = scheduler.after(60000, main.timer_finished)
+    main.timer_end_time = main.datetime.now() - main.timedelta(seconds=1)
+
+    main.refresh_timer_display()
+
+    assert finished == [True]
+    assert scheduler.pending == {}
+    assert main.refresh_id is None

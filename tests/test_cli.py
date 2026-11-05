@@ -1,3 +1,4 @@
+import socket
 import pytest
 
 from break_reminder import cli
@@ -362,7 +363,7 @@ def test_show_existing_app_leaves_unreachable_socket(isolated_paths):
 def test_show_existing_app_sends_show(isolated_paths):
     cli.ensure_runtime_dir()
 
-    with cli.socket.socket(cli.socket.AF_UNIX, cli.socket.SOCK_STREAM) as srv:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as srv:
         srv.bind(str(cli.SOCKET_FILE))
         srv.listen(1)
 

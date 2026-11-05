@@ -1,10 +1,9 @@
-import socket
 import subprocess
 import sys  # System module to interact with the Python runtime environment
 # (interpreters, command-line arguments, etc.)
 from pathlib import Path
 
-from break_reminder import autostart, config
+from break_reminder import autostart, config, ipc
 
 
 RUNTIME_DIR = Path.home() / ".config" / "break-reminder"
@@ -21,8 +20,7 @@ def ensure_runtime_dir():
 def send_command(command):
     # Sends a command to the running GUI. Returns False if no GUI is running.
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.connect(str(SOCKET_FILE))
+        with ipc.connect(SOCKET_FILE) as sock:
             sock.sendall(command.encode())
         return True
     except OSError:

@@ -12,7 +12,7 @@ from ddgs import DDGS
 from ddgs.exceptions import DDGSException
 from PIL import Image, ImageTk
 
-from break_reminder import autostart, config
+from break_reminder import autostart, config, ipc
 
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 700
@@ -617,26 +617,17 @@ def acquire_instance_lock():
 
 def handle_commands():
     try:
-        RUNTIME_DIR.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        SOCKET_FILE.unlink(missing_ok=True)
-
-        server = socket.socket(
-            socket.AF_UNIX,
-            socket.SOCK_STREAM,
-        )
-
-        server.bind(str(SOCKET_FILE))
-        server.listen(1)
+        server, path = ipc.listen(SOCKET_FILE, config.log_warning)
     except OSError as error:
         config.log_warning(
-            f"Could not listen on {SOCKET_FILE}, CLI commands won't work: {error}",
+            f"Could not listen on any socket path, CLI commands won't work: "
+            f"{error}",
             level="ERROR",
         )
         return
+
+    if path != SOCKET_FILE:
+        config.log_warning(f"Listening on fallback socket {path}")
 
     while True:
         connection, _ = server.accept()
@@ -669,12 +660,7 @@ def poll_commands():
 
 def show_existing_app():
     try:
-        with socket.socket(
-            socket.AF_UNIX,
-            socket.SOCK_STREAM,
-        ) as sock:
-            sock.settimeout(0.5)
-            sock.connect(str(SOCKET_FILE))
+        with ipc.connect(SOCKET_FILE, timeout=0.5) as sock:
             sock.sendall(b"show")
         return True
     except OSError:

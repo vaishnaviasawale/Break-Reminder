@@ -49,11 +49,12 @@ def load_config():
     ensure_config_exists()
 
     try:
-        loaded = json.loads(CONFIG_FILE.read_text())
+        loaded = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         # json.loads is different from json.load
         # It reads the JSON {"enabled": true} to
         # {"enabled": True}
-    except (json.JSONDecodeError, OSError) as error:
+    except (ValueError, OSError) as error:
+        # ValueError covers both JSONDecodeError and UnicodeDecodeError
         log_warning(f"Could not read {CONFIG_FILE}, using defaults: {error}")
         return dict(DEFAULT_CONFIG)
 

@@ -108,6 +108,22 @@ def test_corrupt_config_falls_back_to_default(tmp_path, monkeypatch):
     assert config.is_enabled() is True
 
 
+def test_non_utf8_config_falls_back_to_default(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config_dir.mkdir()
+    config_file.write_bytes(b"\xff\xfe\x00")
+
+    assert config.load_config() == config.DEFAULT_CONFIG
+
+    log = (config_dir / config.LOG_NAME).read_text()
+    assert "using defaults" in log
+
+
 def test_non_object_config_falls_back_to_default(tmp_path, monkeypatch):
     config_dir = tmp_path / "break-reminder"
     config_file = config_dir / "config.json"

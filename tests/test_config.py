@@ -1,3 +1,5 @@
+import pytest
+
 from break_reminder import config
 
 
@@ -148,6 +150,25 @@ def test_missing_enabled_key_falls_back_to_default(tmp_path, monkeypatch):
     config_file.write_text("{}")
 
     assert config.is_enabled() is True
+
+
+@pytest.mark.parametrize("raw", ['"false"', '"no"', "null", "0", "1", "[]"])
+def test_non_bool_enabled_falls_back_to_default_and_is_logged(
+    tmp_path, monkeypatch, raw
+):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config_dir.mkdir()
+    config_file.write_text(f'{{"enabled": {raw}}}')
+
+    assert config.is_enabled() is True
+
+    log = (config_dir / config.LOG_NAME).read_text()
+    assert "'enabled' must be true or false" in log
 
 
 def test_disable_repairs_corrupt_config(tmp_path, monkeypatch):

@@ -68,6 +68,12 @@ def load_config():
             f"{CONFIG_FILE} is missing {', '.join(missing)}, using defaults"
         )
 
+    if "enabled" in loaded and not isinstance(loaded["enabled"], bool):
+        log_warning(
+            f"{CONFIG_FILE}: 'enabled' must be true or false, using default"
+        )
+        del loaded["enabled"]
+
     # Defaults fill in any missing keys
     return {**DEFAULT_CONFIG, **loaded}
 

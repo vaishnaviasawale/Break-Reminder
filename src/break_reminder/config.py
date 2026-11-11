@@ -46,7 +46,11 @@ def log_warning(message, level="WARNING"):
 
 
 def load_config():
-    ensure_config_exists()
+    try:
+        ensure_config_exists()
+    except OSError as error:
+        log_warning(f"Could not create {CONFIG_FILE}, using defaults: {error}")
+        return dict(DEFAULT_CONFIG)
 
     try:
         loaded = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))

@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -43,6 +44,10 @@ def _write_temp(config):
     try:
         with os.fdopen(fd, "w") as tmp_file:
             json.dump(config, tmp_file, indent=4)
+            # Force the data to disk before the file is renamed into place,
+            # so a power loss can't leave an empty config.json.
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
     except BaseException:
         Path(tmp_path).unlink(missing_ok=True)
         raise
@@ -104,12 +109,45 @@ def save_config(config):
     # Write to a temp file in the same directory, then swap it into place.
     # os.replace is atomic, so a crash mid-write can never leave a
     # truncated config.json behind.
+    _remove_stale_temp_files()
     tmp_path = _write_temp(config)
     try:
         os.replace(tmp_path, CONFIG_FILE)
     except BaseException:
         Path(tmp_path).unlink(missing_ok=True)
         raise
+    _fsync_dir(CONFIG_DIR)
+
+
+def _fsync_dir(directory):
+    # Persist the rename itself. Best effort: not all platforms allow
+    # opening a directory.
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _remove_stale_temp_files(max_age_seconds=3600):
+    # A process killed between mkstemp and os.replace leaves a *.tmp file
+    # behind. Only delete old ones so a write in progress in another
+    # process is never touched.
+    cutoff = time.time() - max_age_seconds
+    try:
+        for path in CONFIG_DIR.glob("*.tmp"):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 def is_enabled():

@@ -65,12 +65,19 @@ def launch_gui():
     # start_new_session=True
 
 
-def enable_autostart():
+def run_autostart(action):
+    # Permission denied, disk full, a missing executable, etc. are all
+    # OSErrors (FileNotFoundError included). Show a message and exit 1
+    # instead of a traceback.
     try:
-        autostart.enable()
-    except FileNotFoundError as error:
-        print(error)
+        action()
+    except OSError as error:
+        print(f"Autostart failed: {error}")
         raise SystemExit(1)
+
+
+def enable_autostart():
+    run_autostart(autostart.enable)
 
 
 def main():
@@ -151,9 +158,9 @@ def main():
         if subcommand == "enable":
             enable_autostart()
         elif subcommand == "disable":
-            autostart.disable()
+            run_autostart(autostart.disable)
         elif subcommand == "status":
-            autostart.status()
+            run_autostart(autostart.status)
         else:
             print(f"Unknown autostart command: {subcommand}")
             raise SystemExit(1)

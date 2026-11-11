@@ -21,16 +21,32 @@ def ensure_config_exists():
         exist_ok=True,
     )
 
-    if not CONFIG_FILE.exists():
-        CONFIG_FILE.write_text(
-            json.dumps(
-                DEFAULT_CONFIG,
-                indent=4,
-            )
-            # json.dumps is different from json.dump
-            # It turns config = {"enabled": True}
-            # {"enabled": true} as a string
-        )
+    if CONFIG_FILE.exists():
+        return
+
+    # Write the defaults to a temp file first, then hard-link it into place.
+    # os.link fails if CONFIG_FILE already exists, so two processes starting
+    # together can't clobber each other (or a config saved in between), and
+    # readers never see a half-written file.
+    tmp_path = _write_temp(DEFAULT_CONFIG)
+    try:
+        os.link(tmp_path, CONFIG_FILE)
+    except FileExistsError:
+        pass
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
+def _write_temp(config):
+    # Write JSON to a temp file in CONFIG_DIR and return its path.
+    fd, tmp_path = tempfile.mkstemp(dir=CONFIG_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as tmp_file:
+            json.dump(config, tmp_file, indent=4)
+    except BaseException:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
+    return tmp_path
 
 
 def log_warning(message, level="WARNING"):
@@ -88,10 +104,8 @@ def save_config(config):
     # Write to a temp file in the same directory, then swap it into place.
     # os.replace is atomic, so a crash mid-write can never leave a
     # truncated config.json behind.
-    fd, tmp_path = tempfile.mkstemp(dir=CONFIG_DIR, suffix=".tmp")
+    tmp_path = _write_temp(config)
     try:
-        with os.fdopen(fd, "w") as tmp_file:
-            json.dump(config, tmp_file, indent=4)
         os.replace(tmp_path, CONFIG_FILE)
     except BaseException:
         Path(tmp_path).unlink(missing_ok=True)

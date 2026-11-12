@@ -76,6 +76,16 @@ def run_autostart(action):
         raise SystemExit(1)
 
 
+def run_config(action):
+    # Permission problems etc. in the config file are OSErrors. Show a
+    # message and exit 1 instead of a traceback.
+    try:
+        action()
+    except OSError as error:
+        print(f"Config error: {error}")
+        raise SystemExit(1)
+
+
 def enable_autostart():
     run_autostart(autostart.enable)
 
@@ -110,7 +120,7 @@ def main():
             print("Usage: break-reminder enable")
             raise SystemExit(1)
 
-        config.enable()
+        run_config(config.enable)
         send_command("config-changed")
         print("Break reminder enabled.")
         return
@@ -120,7 +130,7 @@ def main():
             print("Usage: break-reminder disable")
             raise SystemExit(1)
 
-        config.disable()
+        run_config(config.disable)
         send_command("config-changed")
         print("Break reminder disabled.")
         return
@@ -130,7 +140,7 @@ def main():
             print("Usage: break-reminder status")
             raise SystemExit(1)
 
-        config.status()
+        run_config(config.status)
         return
 
     if command == "quit":

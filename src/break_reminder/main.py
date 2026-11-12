@@ -4,6 +4,7 @@ import tkinter as tk
 from io import BytesIO
 from pathlib import Path
 import queue
+import traceback
 import socket
 import threading
 from datetime import datetime, timedelta
@@ -668,6 +669,20 @@ def show_existing_app():
 
 
 def main():
+    # Any startup failure (no display, unwritable runtime dir, ...) is logged
+    # and ends the process with exit code 1 instead of a bare traceback.
+    try:
+        run_app()
+    except Exception as error:
+        config.log_warning(
+            f"GUI crashed: {type(error).__name__}: {error}\n"
+            f"{traceback.format_exc()}",
+            level="ERROR",
+        )
+        raise SystemExit(1)
+
+
+def run_app():
     instance_lock = acquire_instance_lock()
     # Since instance_lock is a local variable in main() and main() doesn't
     # return until the GUI exits, it stays alive for the lifetime of the GUI

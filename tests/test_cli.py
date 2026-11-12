@@ -372,3 +372,23 @@ def test_show_existing_app_sends_show(isolated_paths):
         connection, _ = srv.accept()
         with connection:
             assert connection.recv(1024) == b"show"
+
+
+def test_launch_gui_logs_and_exits_when_popen_fails(
+    isolated_paths,
+    monkeypatch,
+    capsys,
+):
+    def failing_popen(*args, **kwargs):
+        raise FileNotFoundError("no interpreter")
+
+    monkeypatch.setattr(cli, "show_existing_app", lambda: False)
+    monkeypatch.setattr(cli.subprocess, "Popen", failing_popen)
+
+    with pytest.raises(SystemExit) as error:
+        cli.launch_gui()
+
+    assert error.value.code == 1
+    log_path = cli.config.CONFIG_DIR / cli.config.LOG_NAME
+    assert "no interpreter" in log_path.read_text()
+    assert str(log_path) in capsys.readouterr().out

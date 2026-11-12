@@ -35,21 +35,51 @@ def show_existing_app():
     return send_command("show")
 
 
+def open_gui_log():
+    # The GUI's stderr goes to the shared log so a crash on startup leaves a
+    # traceback there. Falls back to DEVNULL if the log can't be opened.
+    try:
+        config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        return (config.CONFIG_DIR / config.LOG_NAME).open("a")
+    except OSError:
+        return subprocess.DEVNULL
+
+
+def fail_launch(error):
+    config.log_warning(f"Could not start the GUI: {error}", level="ERROR")
+    print(
+        f"Could not start Break Reminder: {error}\n"
+        f"See {config.CONFIG_DIR / config.LOG_NAME} for details."
+    )
+    raise SystemExit(1)
+
+
 def launch_gui():
-    ensure_runtime_dir()
+    try:
+        ensure_runtime_dir()
+    except OSError as error:
+        fail_launch(error)
 
     if show_existing_app():
         return
 
-    # sys.executable tells it to use the exact Python interpreter that is
-    # currently running this break-reminder command.
-    subprocess.Popen(
-        [sys.executable, "-m", "break_reminder.main"],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    gui_log = open_gui_log()
+    try:
+        # sys.executable tells it to use the exact Python interpreter that is
+        # currently running this break-reminder command.
+        subprocess.Popen(
+            [sys.executable, "-m", "break_reminder.main"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=gui_log,
+            start_new_session=True,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        fail_launch(error)
+    finally:
+        # The child has its own copy of the descriptor.
+        if gui_log is not subprocess.DEVNULL:
+            gui_log.close()
     # The GUI doesn't need input from the terminal, so we disconnect its
     # standard input. The GUI shouldn't print things into your terminal,
     # so we disconnect the standard output and standard errors too.

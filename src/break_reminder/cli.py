@@ -17,12 +17,18 @@ def ensure_runtime_dir():
     )
 
 
+COMMAND_TIMEOUT = 2
+
+
 def send_command(command):
-    # Sends a command to the running GUI. Returns False if no GUI is running.
+    # Sends a command to the running GUI. Returns False if no GUI is running
+    # or it doesn't acknowledge within COMMAND_TIMEOUT seconds.
     try:
-        with ipc.connect(SOCKET_FILE) as sock:
+        with ipc.connect(SOCKET_FILE, timeout=COMMAND_TIMEOUT) as sock:
             sock.sendall(command.encode())
-        return True
+            # Wait for the GUI to acknowledge; a hung GUI times out (an
+            # OSError) instead of being reported as having acted.
+            return sock.recv(len(ipc.ACK)) == ipc.ACK
     except OSError:
         # Treat the GUI as unreachable rather than crashing after the config
         # has already been saved. Don't delete the socket file here: a refused

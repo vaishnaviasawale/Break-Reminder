@@ -1066,17 +1066,16 @@ def test_show_existing_app_returns_false_without_server(
 )
 def test_command_reaches_running_gui(monkeypatch, tmp_path, command, handler):
     socket_file = tmp_path / "br.sock"
-    received = threading.Event()
     calls = []
 
     class FakeRoot:
         def after(self, delay, callback):
-            calls.append((delay, callback))
-            received.set()
+            pass
 
     monkeypatch.setattr(main, "RUNTIME_DIR", tmp_path)
     monkeypatch.setattr(main, "SOCKET_FILE", socket_file)
     monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+    monkeypatch.setattr(main, handler, lambda: calls.append(handler))
 
     main.start_command_server()
 
@@ -1087,13 +1086,18 @@ def test_command_reaches_running_gui(monkeypatch, tmp_path, command, handler):
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.connect(str(socket_file))
                 sock.sendall(command)
+                sock.settimeout(2)
+                # The GUI acknowledges receipt of every command.
+                assert sock.recv(16) == main.ipc.ACK
             break
         except OSError:
             assert time.monotonic() < deadline, "command server never started"
             time.sleep(0.01)
 
-    assert received.wait(timeout=2)
-    assert calls == [(0, getattr(main, handler))]
+    # The ack is sent after the command is queued; the main thread then
+    # picks it up in poll_commands().
+    main.poll_commands()
+    assert calls == [handler]
 
 
 def test_start_button_greyed_out_with_hint_when_disabled(monkeypatch):

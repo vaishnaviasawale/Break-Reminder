@@ -1,4 +1,6 @@
 import socket
+import threading
+
 import pytest
 
 from break_reminder import cli
@@ -360,18 +362,67 @@ def test_show_existing_app_leaves_unreachable_socket(isolated_paths):
     assert cli.SOCKET_FILE.exists() is True
 
 
+def _serve_once(srv, reply, received):
+    connection, _ = srv.accept()
+    with connection:
+        received.append(connection.recv(1024))
+        if reply:
+            connection.sendall(reply)
+
+
 def test_show_existing_app_sends_show(isolated_paths):
     cli.ensure_runtime_dir()
+    received = []
 
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as srv:
         srv.bind(str(cli.SOCKET_FILE))
         srv.listen(1)
+        thread = threading.Thread(
+            target=_serve_once, args=(srv, cli.ipc.ACK, received)
+        )
+        thread.start()
 
         assert cli.show_existing_app() is True
 
-        connection, _ = srv.accept()
-        with connection:
-            assert connection.recv(1024) == b"show"
+        thread.join(timeout=2)
+        assert received == [b"show"]
+
+
+def test_send_command_fails_when_gui_never_acknowledges(
+    isolated_paths, monkeypatch
+):
+    # A hung GUI accepts the connection but never replies.
+    monkeypatch.setattr(cli, "COMMAND_TIMEOUT", 0.2)
+    cli.ensure_runtime_dir()
+    received = []
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as srv:
+        srv.bind(str(cli.SOCKET_FILE))
+        srv.listen(1)
+        thread = threading.Thread(
+            target=_serve_once, args=(srv, b"", received)
+        )
+        thread.start()
+
+        assert cli.send_command("quit") is False
+
+        thread.join(timeout=2)
+        assert received == [b"quit"]
+
+
+def test_send_command_fails_when_connect_times_out(
+    isolated_paths, monkeypatch
+):
+    seen = {}
+
+    def hung_connect(path, timeout=None):
+        seen["timeout"] = timeout
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(cli.ipc, "connect", hung_connect)
+
+    assert cli.send_command("show") is False
+    assert seen["timeout"] == cli.COMMAND_TIMEOUT
 
 
 def test_launch_gui_logs_and_exits_when_popen_fails(

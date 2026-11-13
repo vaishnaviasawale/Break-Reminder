@@ -636,9 +636,16 @@ def handle_commands():
         with connection:
             command = connection.recv(1024).decode()
 
-        # Don't touch Tkinter from this thread; hand the command to the
-        # main thread, which picks it up in poll_commands().
-        command_queue.put(command)
+            # Don't touch Tkinter from this thread; hand the command to the
+            # main thread, which picks it up in poll_commands().
+            command_queue.put(command)
+
+            # Acknowledge receipt so the CLI knows the GUI got the command.
+            # The client may already have gone away; that's not an error.
+            try:
+                connection.sendall(ipc.ACK)
+            except OSError:
+                pass
 
 
 def poll_commands():

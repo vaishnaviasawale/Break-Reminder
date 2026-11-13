@@ -73,6 +73,10 @@ def listen(primary, log, attempts=None, retry_seconds=None):
     raise last_error
 
 
+# Reply the GUI sends once it has received a command.
+ACK = b"ok"
+
+
 def connect(primary, timeout=None):
     # Returns a connected socket from the first candidate that accepts.
     last_error = None

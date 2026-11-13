@@ -213,15 +213,30 @@ def test_no_arguments_launches_gui(monkeypatch):
     assert launched is True
 
 
-@pytest.mark.parametrize("flag", ["--help", "-h"])
-def test_help_lists_commands(monkeypatch, capsys, flag):
-    run_cli(monkeypatch, flag)
+def test_help_lists_commands(monkeypatch, capsys):
+    run_cli(monkeypatch, "--help")
 
     output = capsys.readouterr().out
 
     assert "Usage:" in output
     assert "quit" in output
     assert "autostart enable" in output
+
+
+def test_help_rejects_extra_arguments(monkeypatch, capsys):
+    with pytest.raises(SystemExit) as error:
+        run_cli(monkeypatch, "--help", "foo")
+
+    assert error.value.code == 1
+    assert "Usage: break-reminder --help" in capsys.readouterr().out
+
+
+def test_short_help_flag_is_unknown(monkeypatch, capsys):
+    with pytest.raises(SystemExit) as error:
+        run_cli(monkeypatch, "-h")
+
+    assert error.value.code == 1
+    assert "Unknown command: -h" in capsys.readouterr().out
 
 
 def test_enable_and_disable_notify_running_gui(

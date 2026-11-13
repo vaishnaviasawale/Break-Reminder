@@ -133,7 +133,11 @@ def main():
 
     command = sys.argv[1]
 
-    if command in ("--help", "-h"):
+    if command == "--help":
+        if len(sys.argv) != 2:
+            print("Usage: break-reminder --help")
+            raise SystemExit(1)
+
         print("Usage:")
         print("  break-reminder")
         print("  break-reminder <command>")

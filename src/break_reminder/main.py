@@ -23,7 +23,7 @@ MAX_MINUTES = 24 * 60
 PROJECT_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = PROJECT_DIR / "assets"
 
-RUNTIME_DIR = Path.home() / ".config" / "break-reminder"
+RUNTIME_DIR = config.CONFIG_DIR
 SOCKET_FILE = RUNTIME_DIR / "break-reminder.sock"
 LOCK_FILE = RUNTIME_DIR / "break-reminder.lock"
 

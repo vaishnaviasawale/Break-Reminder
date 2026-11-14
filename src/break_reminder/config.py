@@ -1,6 +1,7 @@
 import fcntl
 import json
 import os
+import shutil
 import tempfile
 import time
 from contextlib import contextmanager
@@ -14,6 +15,8 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 LOG_NAME = "break-reminder.log"
 
 LOCK_NAME = "config.lock"
+
+BACKUP_NAME = "config.json.bak"
 
 DEFAULT_CONFIG = {
     "enabled": True,
@@ -70,6 +73,20 @@ def log_warning(message, level="WARNING"):
         pass
 
 
+def _backup_corrupt_config():
+    # enable()/disable() save whatever load_config returned, which for a
+    # corrupt file is the defaults. Keep a copy of the bad file so the user's
+    # settings can still be recovered by hand. Copy rather than rename so a
+    # read never removes config.json out from under another process.
+    backup = CONFIG_DIR / BACKUP_NAME
+    try:
+        shutil.copy2(CONFIG_FILE, backup)
+    except OSError as error:
+        log_warning(f"Could not back up {CONFIG_FILE}: {error}")
+        return
+    log_warning(f"Backed up corrupt config to {backup}")
+
+
 def load_config():
     try:
         ensure_config_exists()
@@ -85,10 +102,13 @@ def load_config():
     except (ValueError, OSError) as error:
         # ValueError covers both JSONDecodeError and UnicodeDecodeError
         log_warning(f"Could not read {CONFIG_FILE}, using defaults: {error}")
+        if isinstance(error, ValueError):
+            _backup_corrupt_config()
         return dict(DEFAULT_CONFIG)
 
     if not isinstance(loaded, dict):
         log_warning(f"{CONFIG_FILE} is not a JSON object, using defaults")
+        _backup_corrupt_config()
         return dict(DEFAULT_CONFIG)
 
     missing = sorted(DEFAULT_CONFIG.keys() - loaded.keys())

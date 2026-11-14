@@ -282,3 +282,33 @@ def test_unserializable_config_does_not_clobber_file(tmp_path, monkeypatch):
 
     assert config.is_enabled() is False
     assert list(config_dir.glob("*.tmp")) == []
+
+
+def test_corrupt_config_is_backed_up_before_overwrite(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config_dir.mkdir()
+    config_file.write_text("{not valid json")
+
+    config.disable()
+
+    assert (config_dir / config.BACKUP_NAME).read_text() == "{not valid json"
+    assert config.is_enabled() is False
+    assert "Backed up corrupt config" in (config_dir / config.LOG_NAME).read_text()
+
+
+def test_valid_config_is_not_backed_up(tmp_path, monkeypatch):
+    config_dir = tmp_path / "break-reminder"
+    config_file = config_dir / "config.json"
+
+    monkeypatch.setattr(config, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(config, "CONFIG_FILE", config_file)
+
+    config.disable()
+    config.enable()
+
+    assert not (config_dir / config.BACKUP_NAME).exists()

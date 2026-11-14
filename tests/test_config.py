@@ -298,7 +298,10 @@ def test_corrupt_config_is_backed_up_before_overwrite(tmp_path, monkeypatch):
 
     assert (config_dir / config.BACKUP_NAME).read_text() == "{not valid json"
     assert config.is_enabled() is False
-    assert "Backed up corrupt config" in (config_dir / config.LOG_NAME).read_text()
+    assert (
+        "Backed up corrupt config"
+        in (config_dir / config.LOG_NAME).read_text()
+    )
 
 
 def test_valid_config_is_not_backed_up(tmp_path, monkeypatch):

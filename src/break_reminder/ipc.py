@@ -4,7 +4,6 @@ import tempfile
 import time
 from pathlib import Path
 
-
 BIND_ATTEMPTS = 3
 BIND_RETRY_SECONDS = 1
 
@@ -56,7 +55,9 @@ def listen(primary, log, attempts=None, retry_seconds=None):
     # out transient errors. Returns (server, path), or raises the last
     # OSError once everything has failed.
     attempts = BIND_ATTEMPTS if attempts is None else attempts
-    retry_seconds = BIND_RETRY_SECONDS if retry_seconds is None else retry_seconds
+    retry_seconds = (
+        BIND_RETRY_SECONDS if retry_seconds is None else retry_seconds
+    )
     last_error = None
 
     for attempt in range(attempts):

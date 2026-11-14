@@ -1,16 +1,15 @@
 import fcntl
+import queue
 import random
+import threading
 import tkinter as tk
+import traceback
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
-import queue
-import traceback
-import socket
-import threading
-from datetime import datetime, timedelta
+
 import requests
 from ddgs import DDGS
-from ddgs.exceptions import DDGSException
 from PIL import Image, ImageTk
 
 from break_reminder import autostart, config, ipc
@@ -190,7 +189,7 @@ def fetch_image():
 
         return image, title
 
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         # Network errors, bad JSON (KeyError), undecodable or rejected images
         # and so on. Whatever went wrong, the break must still show up.
         pass
@@ -200,7 +199,7 @@ def fetch_image():
 
         if fallback is not None:
             return fallback
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
     return None, "Time for a break!"
@@ -253,7 +252,7 @@ def image_deadline(request_id):
 
     try:
         fallback = get_fallback_image()
-    except Exception:
+    except Exception:  # noqa: BLE001
         fallback = None
 
     if fallback is None:
@@ -265,7 +264,7 @@ def image_deadline(request_id):
 def fetch_image_in_background(request_id):
     try:
         image, title = fetch_image()
-    except Exception:
+    except Exception:  # noqa: BLE001
         image, title = None, "Time for a break!"
 
     # Don't touch Tkinter from this thread; poll_images() picks this up
@@ -291,7 +290,7 @@ def show_image(image, title):
 
     try:
         photo = to_photo(image) if image is not None else None
-    except Exception:
+    except Exception:  # noqa: BLE001
         photo = None
 
     instruction_label.config(
@@ -403,7 +402,7 @@ def timer_finished():
 
     try:
         update_content()
-    except Exception:
+    except Exception:  # noqa: BLE001
         # A broken image must never stop the break popup from appearing
         instruction_label.config(
             text="Time for a break!",
@@ -425,9 +424,7 @@ def start_timer():
     minutes_text = time_entry.get().strip()
 
     if not minutes_text:
-        error_label.config(
-            text="Please enter the number of minutes."
-        )
+        error_label.config(text="Please enter the number of minutes.")
         return
 
     try:
@@ -438,15 +435,11 @@ def start_timer():
         # value is invalid
         # If it was something like int([1, 2, 3]) it would be a TypeError as
         # Python does not even know how to convert it into an int
-        error_label.config(
-            text="Please enter a whole number of minutes."
-        )
+        error_label.config(text="Please enter a whole number of minutes.")
         return
 
     if minutes <= 0:
-        error_label.config(
-            text="Please enter a number greater than 0."
-        )
+        error_label.config(text="Please enter a number greater than 0.")
         return
 
     if minutes > MAX_MINUTES:
@@ -464,7 +457,7 @@ def start_timer():
 
     cancel_refresh_loop()
 
-    timer_end_time = datetime.now() + timedelta(
+    timer_end_time = datetime.now() + timedelta(  # noqa: DTZ005
         minutes=minutes,
     )
 
@@ -499,7 +492,7 @@ def update_timer_display():
         timer_status_label.config(text="")
         return
 
-    remaining = timer_end_time - datetime.now()
+    remaining = timer_end_time - datetime.now()  # noqa: DTZ005
 
     total_seconds = max(
         0,
@@ -511,10 +504,7 @@ def update_timer_display():
     break_time = timer_end_time.strftime("%I:%M %p").lstrip("0")
 
     timer_status_label.config(
-        text=(
-            f"Next break in {minutes}:{seconds:02d}\n"
-            f"Break at {break_time}"
-        )
+        text=(f"Next break in {minutes}:{seconds:02d}\nBreak at {break_time}")
     )
 
 
@@ -528,7 +518,7 @@ def refresh_timer_display():
     # root.after() uses monotonic time, which pauses during suspend, while
     # the deadline is wall-clock. Fire on the deadline here so a resume
     # doesn't leave the label at 0:00 with no popup.
-    if datetime.now() >= timer_end_time:
+    if datetime.now() >= timer_end_time:  # noqa: DTZ005
         refresh_id = None
         if timer_id is not None:
             root.after_cancel(timer_id)
@@ -680,7 +670,7 @@ def main():
     # and ends the process with exit code 1 instead of a bare traceback.
     try:
         run_app()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         config.log_warning(
             f"GUI crashed: {type(error).__name__}: {error}\n"
             f"{traceback.format_exc()}",

@@ -1,5 +1,4 @@
 import socket
-import threading
 import time
 
 import pytest
@@ -1138,7 +1137,9 @@ def test_start_button_active_without_hint_when_enabled(monkeypatch):
 def autostart_paths(tmp_path, monkeypatch):
     desktop_file = tmp_path / "autostart" / "break-reminder.desktop"
 
-    monkeypatch.setattr(main.autostart, "AUTOSTART_DIR", tmp_path / "autostart")
+    monkeypatch.setattr(
+        main.autostart, "AUTOSTART_DIR", tmp_path / "autostart"
+    )
     monkeypatch.setattr(main.autostart, "DESKTOP_FILE", desktop_file)
     monkeypatch.setattr(
         main.autostart.shutil,
@@ -1149,7 +1150,9 @@ def autostart_paths(tmp_path, monkeypatch):
     return desktop_file
 
 
-def test_ticking_start_at_login_enables_autostart(monkeypatch, autostart_paths):
+def test_ticking_start_at_login_enables_autostart(
+    monkeypatch, autostart_paths
+):
     monkeypatch.setattr(main, "autostart_var", FakeVar(True), raising=False)
     monkeypatch.setattr(main, "error_label", FakeLabel(), raising=False)
 
@@ -1239,8 +1242,12 @@ def test_update_content_fetches_in_background_with_deadline(monkeypatch):
 def test_image_deadline_shows_fallback_if_nothing_arrived(monkeypatch):
     shown = []
     monkeypatch.setattr(main, "image_request_id", 3)
-    monkeypatch.setattr(main, "get_fallback_image", lambda: ("img", "Time for a break!"))
-    monkeypatch.setattr(main, "show_image", lambda image, title: shown.append((image, title)))
+    monkeypatch.setattr(
+        main, "get_fallback_image", lambda: ("img", "Time for a break!")
+    )
+    monkeypatch.setattr(
+        main, "show_image", lambda image, title: shown.append((image, title))
+    )
 
     main.image_deadline(2)  # stale: that break already finished
     assert shown == []
@@ -1303,7 +1310,9 @@ def test_show_image_stays_hidden_if_disabled(monkeypatch):
 
 def test_poll_images_ignores_stale_results(monkeypatch):
     shown = []
-    monkeypatch.setattr(main, "show_image", lambda image, title: shown.append(title))
+    monkeypatch.setattr(
+        main, "show_image", lambda image, title: shown.append(title)
+    )
 
     class FakeRoot:
         def after(self, ms, callback):

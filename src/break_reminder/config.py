@@ -67,7 +67,9 @@ def log_warning(message, level="WARNING"):
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with (CONFIG_DIR / LOG_NAME).open("a") as log:
-            timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+            timestamp = (
+                datetime.now().astimezone().isoformat(timespec="seconds")
+            )
             log.write(f"{timestamp} {level} {message}\n")
     except OSError:
         pass

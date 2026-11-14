@@ -1,9 +1,8 @@
 import subprocess
 import sys  # System module to interact with the Python runtime environment
+
 # (interpreters, command-line arguments, etc.)
-
 from break_reminder import autostart, config, ipc
-
 
 RUNTIME_DIR = config.CONFIG_DIR
 SOCKET_FILE = RUNTIME_DIR / "break-reminder.sock"

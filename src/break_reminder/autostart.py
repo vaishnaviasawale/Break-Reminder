@@ -33,7 +33,7 @@ def quote_exec(path):
     # must be backslash-escaped, and the .desktop string layer then requires
     # each backslash doubled.
     # A literal % is written %% so it isn't read as a field code.
-    if not any(char in path for char in ' \t\n"\'\\><~|&;$*?#()`%'):
+    if not any(char in path for char in " \t\n\"'\\><~|&;$*?#()`%"):
         return path
 
     escaped = path.replace("\\", "\\\\\\\\")

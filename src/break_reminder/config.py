@@ -1,7 +1,9 @@
+import fcntl
 import json
 import os
 import tempfile
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +12,8 @@ CONFIG_DIR = Path.home() / ".config" / "break-reminder"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 LOG_NAME = "break-reminder.log"
+
+LOCK_NAME = "config.lock"
 
 DEFAULT_CONFIG = {
     "enabled": True,
@@ -155,16 +159,31 @@ def is_enabled():
     return config["enabled"]
 
 
+@contextmanager
+def _config_lock():
+    # Serialize read-modify-write cycles across processes. The lock is on a
+    # separate file because save_config swaps config.json's inode with
+    # os.replace, which would silently drop a lock held on config.json.
+    # flock is released when the file closes, even if the process dies.
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_DIR / LOCK_NAME, "a") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        yield
+
+
+def _set_enabled(value):
+    with _config_lock():
+        config = load_config()
+        config["enabled"] = value
+        save_config(config)
+
+
 def enable():
-    config = load_config()
-    config["enabled"] = True
-    save_config(config)
+    _set_enabled(True)
 
 
 def disable():
-    config = load_config()
-    config["enabled"] = False
-    save_config(config)
+    _set_enabled(False)
 
 
 def status():

@@ -15,7 +15,7 @@ from PIL import Image, ImageTk
 from break_reminder import autostart, config, ipc
 
 WINDOW_WIDTH = 700
-WINDOW_HEIGHT = 700
+WINDOW_HEIGHT = 1060  # Tall enough for the largest picture (300px) plus all controls
 
 MAX_MINUTES = 24 * 60
 
@@ -286,17 +286,14 @@ def poll_images():
 
 
 def show_image(image, title):
+    # The title is no longer displayed (the window title bar already says
+    # "Time for a break!"), but fetchers still return it.
     invalidate_pending_image()
 
     try:
         photo = to_photo(image) if image is not None else None
     except Exception:  # noqa: BLE001
         photo = None
-
-    instruction_label.config(
-        text=title,
-        font=("Sans", 18, "bold"),
-    )
 
     if photo is None:
         image_label.config(image="")
@@ -397,6 +394,12 @@ def timer_finished():
     timer_id = None
     timer_end_time = None
 
+    # The countdown label was last updated up to a second before the deadline,
+    # so it would still read "Next break in 0:00". Stop the countdown and clear
+    # the label now that the break has arrived.
+    cancel_refresh_loop()
+    update_timer_display()
+
     if not config.is_enabled():
         return  # Stay hidden: the reminder was switched off
 
@@ -404,10 +407,6 @@ def timer_finished():
         update_content()
     except Exception:  # noqa: BLE001
         # A broken image must never stop the break popup from appearing
-        instruction_label.config(
-            text="Time for a break!",
-            font=("Sans", 18, "bold"),
-        )
         image_label.config(image="")
         image_label.image = None
         raise_window()
@@ -490,6 +489,7 @@ def update_timer_display():
     # Reading it doesn't require global.
     if timer_end_time is None:
         timer_status_label.config(text="")
+        timer_status_label.pack_forget()
         return
 
     remaining = timer_end_time - datetime.now()  # noqa: DTZ005
@@ -506,6 +506,9 @@ def update_timer_display():
     timer_status_label.config(
         text=(f"Next break in {minutes}:{seconds:02d}\nBreak at {break_time}")
     )
+    # Only visible while a timer is running, i.e. when the window has been
+    # reopened mid-timer. pack() on an already packed label changes nothing.
+    timer_status_label.pack(pady=10)
 
 
 def refresh_timer_display():
@@ -689,7 +692,6 @@ def run_app():
         return
 
     global root
-    global instruction_label
     global image_label
     global time_entry
     global start_button
@@ -708,18 +710,15 @@ def run_app():
     root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
 
-    instruction_label = tk.Label(
-        root,
-        font=("Sans", 20, "bold"),
-    )
-    instruction_label.pack(padx=20, pady=20)
+    # The frame keeps the label's place in the layout; with the label hidden
+    # it collapses to nothing.
+    timer_frame = tk.Frame(root)
+    timer_frame.pack()
 
     timer_status_label = tk.Label(
-        root,
+        timer_frame,
         font=("Sans", 16),
     )
-
-    timer_status_label.pack(pady=10)
 
     error_label = tk.Label(
         root,

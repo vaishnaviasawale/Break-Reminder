@@ -27,6 +27,12 @@ class FakeLabel:
     def config(self, **kwargs):
         self.text = kwargs.get("text")
 
+    def pack(self, **kwargs):
+        self.visible = True
+
+    def pack_forget(self):
+        self.visible = False
+
 
 class FakeWidget:
     def __init__(self):
@@ -154,6 +160,35 @@ def test_start_timer_schedules_timer_when_enabled(
     assert withdrawn is True
 
 
+def test_timer_finished_clears_countdown_instead_of_leaving_0_00(monkeypatch):
+    # The last countdown tick happens up to a second before the deadline, so
+    # it would leave "Next break in 0:00" on screen once the break appears.
+    monkeypatch.setattr(main.config, "is_enabled", lambda: True)
+    monkeypatch.setattr(main, "update_content", lambda: None)
+    label = FakeLabel()
+    monkeypatch.setattr(main, "timer_status_label", label, raising=False)
+
+    cancelled = []
+
+    class FakeRoot:
+        def after_cancel(self, after_id):
+            cancelled.append(after_id)
+
+    monkeypatch.setattr(main, "root", FakeRoot(), raising=False)
+
+    main.timer_id = "timer-id"
+    main.refresh_id = "refresh-id"
+    main.timer_end_time = object()
+    label.text = "Next break in 0:00\nBreak at 2:47 PM"
+
+    main.timer_finished()
+
+    assert cancelled == ["refresh-id"]
+    assert main.refresh_id is None
+    assert label.text == ""
+    assert label.visible is False
+
+
 def test_timer_finished_does_not_show_break_if_disabled(
     monkeypatch,
 ):
@@ -162,6 +197,7 @@ def test_timer_finished_does_not_show_break_if_disabled(
         "is_enabled",
         lambda: False,
     )
+    monkeypatch.setattr(main, "timer_status_label", FakeLabel(), raising=False)
 
     content_updated = False
 
@@ -208,6 +244,7 @@ def test_timer_finished_starts_image_fetch_if_enabled(
         "is_enabled",
         lambda: True,
     )
+    monkeypatch.setattr(main, "timer_status_label", FakeLabel(), raising=False)
 
     content_updated = False
 
@@ -441,13 +478,6 @@ def test_fallback_images_are_packaged():
 
 
 def test_show_image_handles_missing_image(monkeypatch):
-    class FakeInstructionLabel:
-        def __init__(self):
-            self.config_calls = []
-
-        def config(self, **kwargs):
-            self.config_calls.append(kwargs)
-
     class FakeImageLabel:
         def __init__(self):
             self.image = "old image"
@@ -456,15 +486,7 @@ def test_show_image_handles_missing_image(monkeypatch):
         def config(self, **kwargs):
             self.config_calls.append(kwargs)
 
-    instruction_label = FakeInstructionLabel()
     image_label = FakeImageLabel()
-
-    monkeypatch.setattr(
-        main,
-        "instruction_label",
-        instruction_label,
-        raising=False,
-    )
 
     monkeypatch.setattr(
         main,
@@ -487,9 +509,6 @@ def test_show_image_handles_missing_image(monkeypatch):
     monkeypatch.setattr(main.config, "is_enabled", lambda: True)
 
     main.show_image(None, "Time for a break!")
-
-    assert instruction_label.config_calls
-    assert instruction_label.config_calls[0]["text"] == "Time for a break!"
 
     assert image_label.config_calls
     assert image_label.config_calls[0]["image"] == ""
@@ -1274,7 +1293,6 @@ def test_show_image_invalidates_pending_and_shows_window(monkeypatch):
             pass
 
     fake_root = FakeRoot()
-    monkeypatch.setattr(main, "instruction_label", FakeLabel(), raising=False)
     monkeypatch.setattr(main, "image_label", FakeLabel(), raising=False)
     monkeypatch.setattr(main, "root", fake_root, raising=False)
     monkeypatch.setattr(main.config, "is_enabled", lambda: True)
@@ -1298,7 +1316,6 @@ def test_show_image_stays_hidden_if_disabled(monkeypatch):
             self.shown = True
 
     fake_root = FakeRoot()
-    monkeypatch.setattr(main, "instruction_label", FakeLabel(), raising=False)
     monkeypatch.setattr(main, "image_label", FakeLabel(), raising=False)
     monkeypatch.setattr(main, "root", fake_root, raising=False)
     monkeypatch.setattr(main.config, "is_enabled", lambda: False)
@@ -1356,3 +1373,18 @@ def test_refresh_fires_break_when_deadline_passed_during_suspend(
     assert finished == [True]
     assert scheduler.pending == {}
     assert main.refresh_id is None
+
+
+def test_countdown_label_visible_only_while_timer_runs(monkeypatch):
+    from datetime import datetime, timedelta
+
+    label = FakeLabel()
+    monkeypatch.setattr(main, "timer_status_label", label, raising=False)
+
+    main.timer_end_time = datetime.now() + timedelta(minutes=5)  # noqa: DTZ005
+    main.update_timer_display()
+    assert label.visible is True
+
+    main.timer_end_time = None
+    main.update_timer_display()
+    assert label.visible is False

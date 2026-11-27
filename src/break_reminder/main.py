@@ -12,10 +12,7 @@ import requests
 from ddgs import DDGS
 from PIL import Image, ImageTk
 
-from break_reminder import autostart, config, ipc
-
-WINDOW_WIDTH = 700
-WINDOW_HEIGHT = 1060  # Tall enough for the largest picture (300px) plus all controls
+from break_reminder import autostart, config, ipc, theme
 
 MAX_MINUTES = 24 * 60
 
@@ -707,73 +704,120 @@ def run_app():
 
     root = tk.Tk()
     root.title("Time for a break!")
-    root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
     root.protocol("WM_DELETE_WINDOW", root.withdraw)
+    card = theme.build_card(root)
+
+    ornament = tk.Label(
+        card,
+        text="✿   ✦   ✿",
+        font=theme.BODY_FONT,
+        bg=theme.CREAM,
+        fg=theme.GOLD,
+    )
+    ornament.pack()
 
     # The frame keeps the label's place in the layout; with the label hidden
     # it collapses to nothing.
-    timer_frame = tk.Frame(root)
+    timer_frame = tk.Frame(card, bg=theme.CREAM)
     timer_frame.pack()
 
     timer_status_label = tk.Label(
         timer_frame,
-        font=("Sans", 16),
+        font=theme.COUNTDOWN_FONT,
+        **theme.LABEL_STYLE,
     )
 
     error_label = tk.Label(
-        root,
+        card,
         text="",
-        font=("Sans", 12),
+        font=theme.SMALL_FONT,
+        bg=theme.CREAM,
+        fg=theme.ROSE,
+        wraplength=460,
     )
 
-    error_label.pack(pady=5)
+    error_label.pack()
 
-    image_label = tk.Label(root)
-    image_label.pack(pady=15)
+    # The tiny font keeps the label from taking up room while it has no picture
+    image_label = tk.Label(card, font=("P052", 1), bg=theme.CREAM)
+    image_label.pack(pady=4)
 
-    instruction = tk.Label(root, text="How many minutes until the next break?")
-    instruction.pack(pady=10)
+    instruction = tk.Label(
+        card,
+        text="How many minutes\nuntil the next break?",
+        font=theme.SCRIPT_FONT,
+        padx=8,  # Room for the slanted letters, which get clipped otherwise
+        **theme.LABEL_STYLE,
+    )
+    instruction.pack(pady=6)
 
-    time_entry = tk.Entry(root)
-    time_entry.pack()
+    time_entry = tk.Entry(
+        card,
+        width=10,
+        justify=tk.CENTER,
+        font=theme.ENTRY_FONT,
+        bg="white",
+        fg=theme.INK,
+        insertbackground=theme.INK,
+        relief=tk.FLAT,
+        highlightthickness=2,
+        highlightbackground=theme.BLUSH_DARK,
+        highlightcolor=theme.GOLD,
+    )
+    time_entry.pack(ipady=3)
     # bind passes an event argument, which start_timer doesn't accept
     time_entry.bind("<Return>", lambda event: start_timer())
     time_entry.bind("<KP_Enter>", lambda event: start_timer())
 
-    start_button = tk.Button(root, text="Start Timer", command=start_timer)
+    start_button = tk.Button(
+        card,
+        text="Start Timer",
+        command=start_timer,
+        **theme.button_style(theme.BLUSH, theme.BLUSH_DARK),
+    )
     # We skip the parenthesis when calling start_timer as we don't want to
     # execute it immediately
     # This is unline the way we use get_quote or get_image since we need to
     # execute those function immediately and use their values
-    start_button.pack(pady=20)
+    start_button.pack(pady=(14, 4))
 
     disabled_hint_label = tk.Label(
-        root,
+        card,
         text="",
-        font=("Sans", 12),
+        font=theme.SMALL_FONT,
+        wraplength=460,
+        **theme.LABEL_STYLE,
     )
 
     disabled_hint_label.pack()
 
     control_status_button = tk.Button(
-        root,
+        card,
         command=toggle_enabled,
+        **theme.button_style(theme.POWDER, theme.POWDER_DARK),
     )
 
-    control_status_button.pack(pady=10)
+    control_status_button.pack(pady=6)
 
     autostart_var = tk.BooleanVar(value=autostart.is_enabled())
     # Tkinter widgets can't hold a Python bool directly; the Checkbutton
     # reads and writes its ticked state through this variable
 
     autostart_checkbox = tk.Checkbutton(
-        root,
+        card,
         text="Start at login",
         variable=autostart_var,
         command=toggle_autostart,
+        font=theme.BODY_FONT,
+        bg=theme.CREAM,
+        fg=theme.INK,
+        activebackground=theme.CREAM,
+        activeforeground=theme.INK,
+        selectcolor="white",
+        highlightthickness=0,
     )
 
-    autostart_checkbox.pack(pady=5)
+    autostart_checkbox.pack(pady=4)
 
     update_control_button()
 

@@ -8,6 +8,13 @@ from break_reminder import main
 
 
 @pytest.fixture(autouse=True)
+def no_picture_styling(monkeypatch):
+    # Most tests pass fake images that only have thumbnail(); the styling is
+    # tested on real images in test_theme.py
+    monkeypatch.setattr(main.theme, "style_picture", lambda image: image)
+
+
+@pytest.fixture(autouse=True)
 def reset_timer_state():
     main.timer_id = None
     main.timer_end_time = None

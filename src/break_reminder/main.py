@@ -213,6 +213,7 @@ def get_image():
 
 def to_photo(image):
     image.thumbnail((450, 300))
+    image = theme.style_picture(image)
 
     return ImageTk.PhotoImage(image)
 

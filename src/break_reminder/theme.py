@@ -3,12 +3,24 @@
 import random
 import tkinter as tk
 
-from PIL import Image, ImageDraw, ImageFilter, ImageTk
+from PIL import (
+    Image,
+    ImageChops,
+    ImageDraw,
+    ImageEnhance,
+    ImageFilter,
+    ImageOps,
+    ImageTk,
+)
 
 # The window is a square of this size, and only grows taller when the content
 # (a picture) doesn't fit
 WINDOW_SIZE = 760
 MARGIN = 44  # Painted border visible around the card
+
+CREAM_RGB = (253, 248, 241)
+INK_RGB = (91, 70, 80)
+GOLD_RGB = (194, 160, 96)
 
 CREAM = "#fdf8f1"
 BLUSH = "#f4d3d9"
@@ -186,3 +198,49 @@ def build_card(root):
     fit_window()
 
     return card
+
+
+# Pictures from the internet (xkcd, DuckDuckGo) are restyled to match the card.
+# Colour photos get a soft pastel veil; black-and-white comics are recoloured
+# into the card's ink and cream. Pillow only, so no extra dependencies.
+PHOTO_VEIL = 0.22
+PHOTO_MARGIN = 10
+
+
+def is_near_greyscale(image):
+    # xkcd comics are black-and-white line art; photos have real colour
+    saturation = ImageEnhance.Color(image.convert("RGB")).enhance(0)
+    difference = ImageChops.difference(image.convert("RGB"), saturation)
+    return max(difference.getextrema()[c][1] for c in range(3)) < 24
+
+
+def style_picture(image):
+    """Return the picture restyled to suit the card, with a gold border."""
+    if is_near_greyscale(image):
+        grey = ImageOps.grayscale(image)
+        styled = ImageOps.colorize(
+            grey,
+            black=INK_RGB,
+            white=CREAM_RGB,
+            mid=(204, 178, 186),
+        )
+    else:
+        styled = ImageEnhance.Color(image.convert("RGB")).enhance(0.85)
+        styled = ImageEnhance.Contrast(styled).enhance(0.9)
+        veil = Image.new("RGB", styled.size, CREAM_RGB)
+        styled = Image.blend(styled, veil, PHOTO_VEIL)
+
+    pad = PHOTO_MARGIN
+    framed = Image.new(
+        "RGB",
+        (styled.width + 2 * pad, styled.height + 2 * pad),
+        CREAM_RGB,
+    )
+    framed.paste(styled, (pad, pad))
+    draw = ImageDraw.Draw(framed)
+    draw.rectangle(
+        (0, 0, framed.width - 1, framed.height - 1),
+        outline=GOLD_RGB,
+        width=2,
+    )
+    return framed
